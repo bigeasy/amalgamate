@@ -1,0 +1,38 @@
+{
+    "name":             "amalgamate",
+    "version":          "0.0.0",
+    "author":           "Alan Gutierrez <alan@prettyrobots.com>",
+    "description":      "Forward and reverse iteration of a Strata b-tree.",
+    "url":              "http://bigeasy.github.com/amalgamate",
+    "keywords":
+    [
+                        "btree", "leveldb", "levelup", "binary",
+                        "database", "json", "b-tree", "concurrent", "persistence"
+    ],
+    "contributors":     [],
+    "homepage":         "https://github.com/bigeasy/amalgamate",
+    "bugs":             "https://github.com/bigeasy/amalgamate/issues",
+    "licenses":
+    [{
+                        "type": "MIT",
+                        "url": "http://github.com/bigeasy/amalgamate/raw/master/LICENSE"
+    }],
+    "repository":
+    {
+                        "type": "git",
+                        "url": "http://github.com/bigeasy/amalgamate.git"
+    },
+    "dependencies":
+    {
+                        "cadence":            "0.0.26"
+    },
+    "devDependencies":
+    {
+                        "proof":              "0.0.36",
+                        "b-tree":             "0.0.9"
+    },
+    "scripts":
+    {
+                        "test": "proof platform win32 && proof test */*/*.t.js || t/test"
+    }
+}
