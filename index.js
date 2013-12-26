@@ -49,9 +49,9 @@ Amalgamator.prototype.unlock = function () {
 
 exports.amalgamate = cadence(function (step, deleted, primary, iterator) {
     var amalgamator = new Amalgamator(deleted, primary, iterator)
-    step(function () {
-        amalgamator.amalgamate(step())
-    }, function () {
+    step([function () {
         amalgamator.unlock()
+    }], function () {
+        amalgamator.amalgamate(step())
     })
 })
