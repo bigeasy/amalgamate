@@ -13,7 +13,7 @@
     "3": {
         "log": [
             { "type": "pos" },
-            { "type": "add", "value": { "value": "h", "version": 4 } },
+            { "type": "add", "value": { "value": "h", "version": 4, "deleted": true } },
             { "type": "pos" }
         ]
     },

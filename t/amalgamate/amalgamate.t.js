@@ -4,8 +4,8 @@ require('./proof')(2, function (step, serialize, deepEqual, Strata, tmp, gather)
     var skip = require('skip')
     var mvcc = require('mvcc')
     var fs = require('fs')
-    function deleted () {
-        return false
+    function deleted (record) {
+        return record.deleted
     }
     function extractor (record) {
         return record.value
@@ -37,11 +37,15 @@ require('./proof')(2, function (step, serialize, deepEqual, Strata, tmp, gather)
     }, function (stratas) {
         var primary = stratas.shift()
         step(function () {
+            var versions = {}
+            '0 1 2 3 4'.split(/\s/).forEach(function (version) {
+                versions[version] = true
+            })
             stratas.forEach(step([], function (strata) {
-                skip.forward(strata, comparator, { 0: true }, 'a', step())
+                skip.forward(strata, comparator, versions, 'a', step())
             }))
         }, function (iterators) {
-            designate.forward(comparator, deleted, iterators, step())
+            designate.forward(comparator, function () { return false }, iterators, step())
         }, function (iterator) {
             step(function () {
                 amalgamate.amalgamate(deleted, primary, iterator, step())
@@ -53,8 +57,8 @@ require('./proof')(2, function (step, serialize, deepEqual, Strata, tmp, gather)
             var versions
             versions = records.map(function (record) { return record.version })
             records = records.map(function (record) { return record.value })
-            deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i' ], 'records')
-            deepEqual(versions, [ 0, 0, 0, 0, 0, 0, 0, 0, 0 ], 'versions')
+            deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'i' ], 'records')
+            deepEqual(versions, [ 0, 0, 0, 0, 0, 0, 0, 0 ], 'versions')
         }, function () {
             step(function (strata) {
                 strata.close(step())
