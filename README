@@ -1,15 +1,16 @@
-Riffle
+Amalgamate
 
-A Swiss Army asynchronous control flow function for JavaScript.
+Merge staging Strata b-trees containing MVCC versioned records into a primary
+Strata b-tree.
 
-    Documentation:  http://bigeasy.github.io/riffle
-    Source:         http://github.com/bigeasy/riffle
-    Issues:         http://github.com/bigeasy/riffle/issues
+    Documentation:  http://bigeasy.github.io/amalgamate
+    Source:         http://github.com/bigeasy/amalgamate
+    Issues:         http://github.com/bigeasy/amalgamate/issues
 
-    Install:        `npm install riffle`
+    Install:        `npm install amalgamate`
 
     License:        MIT
 
-To learn everything you want to know about Riffle start here:
+To learn everything you want to know about Amalgamate start here:
 
-    http://bigeasy.github.io/riffle
+    http://bigeasy.github.io/amalgamate

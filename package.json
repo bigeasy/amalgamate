@@ -2,11 +2,11 @@
     "name":             "amalgamate",
     "version":          "0.0.2",
     "author":           "Alan Gutierrez <alan@prettyrobots.com>",
-    "description":      "Forward and reverse iteration of a Strata b-tree.",
+    "description":      "Merge staging Strata b-trees containing MVCC versioned records into a primary Strata b-tree. ",
     "url":              "http://bigeasy.github.com/amalgamate",
     "keywords":
     [
-                        "btree", "leveldb", "levelup", "binary",
+                        "btree", "leveldb", "levelup", "binary", "mvcc",
                         "database", "json", "b-tree", "concurrent", "persistence"
     ],
     "contributors":     [],
