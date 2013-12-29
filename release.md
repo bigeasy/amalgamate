@@ -13,3 +13,4 @@ mainly because it is newer and possibly better.
 
  * Upgrade Desginate to 0.0.1. #16.
  * Replace MVCC with Revise. #15.
+ * Upgrade Skip to 0.0.3. #14.

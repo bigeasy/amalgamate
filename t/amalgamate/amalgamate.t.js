@@ -42,7 +42,7 @@ require('./proof')(2, function (step, serialize, deepEqual, Strata, tmp, gather)
                 versions[version] = true
             })
             stratas.forEach(step([], function (strata) {
-                skip.forward(strata, comparator, versions, 'a', step())
+                skip.forward(strata, comparator, versions, {}, 'a', step())
             }))
         }, function (iterators) {
             designate.forward(comparator, function () { return false }, iterators, step())

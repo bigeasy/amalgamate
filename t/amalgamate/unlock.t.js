@@ -43,7 +43,7 @@ require('./proof')(1, function (step, serialize, deepEqual, Strata, tmp, gather)
         var primary = new Bogus()
         step(function () {
             stratas.forEach(step([], function (strata) {
-                skip.forward(strata, comparator, { 0: true }, 'a', step())
+                skip.forward(strata, comparator, { 0: true }, {}, 'a', step())
             }))
         }, function (iterators) {
             designate.forward(comparator, deleted, iterators, step())
