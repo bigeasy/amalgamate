@@ -49,7 +49,7 @@ require('./proof')(1, function (step, serialize, deepEqual, Strata, tmp, gather)
             designate.forward(comparator, deleted, iterators, step())
         }, function (iterator) {
             step([function () {
-                amalgamate.amalgamate(deleted, primary, iterator, step())
+                amalgamate.amalgamate(deleted, 0, primary, iterator, step())
             }, function (_, error) {
                 deepEqual(error.message, 'bogus', 'caught error')
             }], function () {

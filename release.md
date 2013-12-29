@@ -1,3 +1,11 @@
+### Parameterize Primary Version
+
+The primary version number of the primary tree is now configurable. Now, in
+addition to using Amalgamate to merge a collection of staging trees into a
+primary tree, I can use Amalgamate to merge a collection of in-memory records
+into a staging tree, thereby implementing a batch insert or delete of records
+into a staging tree.
+
 ### Upgraded Dependent Libraries
 
 Upgraded the dependent libraries that had shifted their interfaces out from

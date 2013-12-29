@@ -1,8 +1,9 @@
 var cadence = require('cadence')
 var ok = require('assert').ok
 
-function Amalgamator (deleted, primary, iterator) {
+function Amalgamator (deleted, version, primary, iterator) {
     this._deleted = deleted
+    this._version = version
     this._primary = primary
     this._iterator = iterator
 }
@@ -13,7 +14,7 @@ Amalgamator.prototype.amalgamate = cadence(function (step) {
         this._iterator.next(step())
     }, function (record, key) {
         if (record && key) insert = step(function () {
-           key.version = record.version = 0
+           key.version = record.version = this._version
            if (!this._mutator) {this._primary.mutator(key, step(step, function ($) {
                 this._mutator = $
                 return this._mutator.index
@@ -47,8 +48,8 @@ Amalgamator.prototype.unlock = function () {
     if (this._mutator) this._mutator.unlock()
 }
 
-exports.amalgamate = cadence(function (step, deleted, primary, iterator) {
-    var amalgamator = new Amalgamator(deleted, primary, iterator)
+exports.amalgamate = cadence(function (step, deleted, version, primary, iterator) {
+    var amalgamator = new Amalgamator(deleted, version, primary, iterator)
     step([function () {
         amalgamator.unlock()
     }], function () {
