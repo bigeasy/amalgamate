@@ -11,4 +11,5 @@ mainly because it is newer and possibly better.
 
 ### Issue by Issue
 
+ * Upgrade Desginate to 0.0.1. #16.
  * Replace MVCC with Revise. #15.
