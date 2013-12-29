@@ -32,7 +32,7 @@
                         "b-tree":             "0.0.10",
                         "skip":               "0.0.1",
                         "designate":          "0.0.0",
-                        "mvcc":               "0.0.1"
+                        "revise":             "0.0.1"
     },
     "scripts":
     {

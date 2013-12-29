@@ -2,7 +2,7 @@ require('./proof')(2, function (step, serialize, deepEqual, Strata, tmp, gather)
     var amalgamate = require('../..')
     var designate = require('designate')
     var skip = require('skip')
-    var mvcc = require('mvcc')
+    var revise = require('revise')
     var fs = require('fs')
     function deleted (record) {
         return record.deleted
@@ -22,8 +22,8 @@ require('./proof')(2, function (step, serialize, deepEqual, Strata, tmp, gather)
                 serialize(__dirname + '/fixtures/' + name + '.json', tmp + '/' + name, step())
             }, function () {
                 var strata = new Strata({
-                    extractor: mvcc.extractor(extractor),
-                    comparator: mvcc.comparator(comparator),
+                    extractor: revise.extractor(extractor),
+                    comparator: revise.comparator(comparator),
                     leafSize: 3, branchSize: 3,
                     directory: tmp + '/' + name
                 })
