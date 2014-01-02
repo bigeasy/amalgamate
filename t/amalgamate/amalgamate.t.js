@@ -48,7 +48,7 @@ require('./proof')(2, function (step, serialize, deepEqual, Strata, tmp, gather)
             designate.forward(comparator, function () { return false }, iterators, step())
         }, function (iterator) {
             step(function () {
-                amalgamate.amalgamate(deleted, 0, primary, iterator, step())
+                amalgamate(deleted, 0, primary, iterator, step())
             }, function () {
                 iterator.unlock()
                 gather(step, primary)
