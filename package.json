@@ -24,7 +24,6 @@
     },
     "dependencies":
     {
-                        "cadence":            "0.0.26"
     },
     "devDependencies":
     {
@@ -32,6 +31,8 @@
                         "b-tree":             "0.0.10",
                         "skip":               "0.0.4",
                         "designate":          "0.0.2",
+                        "splice":             "0.0.1",
+                        "twiddle":            "0.0.1",
                         "revise":             "0.0.1"
     },
     "scripts":
