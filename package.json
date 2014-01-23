@@ -27,7 +27,7 @@
     },
     "devDependencies":
     {
-                        "proof":              "0.0.36",
+                        "proof":              "0.0.41",
                         "b-tree":             "0.0.10",
                         "skip":               "0.0.4",
                         "designate":          "0.0.2",
