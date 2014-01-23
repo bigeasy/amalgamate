@@ -33,7 +33,7 @@
                         "designate":          "0.0.2",
                         "splice":             "0.0.2",
                         "twiddle":            "0.0.1",
-                        "revise":             "0.0.1"
+                        "revise":             "0.0.2"
     },
     "scripts":
     {
