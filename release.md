@@ -1,5 +1,6 @@
 ### Issue by Issue
 
+ * Remove "url" from `package.json`. #34.
  * Upgrade Proof to 0.0.42. #33.
  * Upgrade Skip to 0.0.6. #32.
  * Upgrade Designate to 0.0.3. #31.
