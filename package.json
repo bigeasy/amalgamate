@@ -9,7 +9,7 @@
                         "database", "json", "b-tree", "concurrent", "persistence"
     ],
     "contributors":     [],
-    "homepage":         "https://github.com/bigeasy/amalgamate",
+    "homepage":         "http://bigeasy.github.io/amalgamate",
     "bugs":             "https://github.com/bigeasy/amalgamate/issues",
     "licenses":
     [{
