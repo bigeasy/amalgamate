@@ -50,8 +50,9 @@ require('./proof')(2, function (step, serialize, deepEqual, Strata, tmp, gather)
             step(function () {
                 amalgamate(deleted, 0, primary, iterator, step())
             }, function () {
-                iterator.unlock()
-                gather(step, primary)
+                iterator.unlock(step())
+            }, function () {
+                gather(primary, step())
             })
         }, function (records) {
             var versions
