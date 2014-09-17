@@ -23,7 +23,7 @@
     },
     "dependencies":
     {
-                        "splice":             "0.0.6",
+                        "splice":             "0.0.7",
                         "twiddle":            "0.0.2"
     },
     "devDependencies":
