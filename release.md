@@ -1,5 +1,6 @@
 ### Issue by Issue
 
+ * Upgrade Skip to 0.0.9. #43.
  * Upgrade Designate to 0.0.7. #42.
  * Upgrade Strata to 0.0.26. #41.
  * Upgrade Proof to 0.0.48. #40.
