@@ -1,4 +1,4 @@
-require('./proof')(2, function (step, serialize, deepEqual, Strata, tmp, gather) {
+require('./proof')(2, function (step, assert) {
     var amalgamate = require('../..')
     var designate = require('designate')
     var skip = require('skip')
@@ -58,8 +58,8 @@ require('./proof')(2, function (step, serialize, deepEqual, Strata, tmp, gather)
             var versions
             versions = records.map(function (record) { return record.version })
             records = records.map(function (record) { return record.value })
-            deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'i' ], 'records')
-            deepEqual(versions, [ 0, 0, 0, 0, 0, 0, 0, 0 ], 'versions')
+            assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'i' ], 'records')
+            assert(versions, [ 0, 0, 0, 0, 0, 0, 0, 0 ], 'versions')
         }, function () {
             step(function (strata) {
                 strata.close(step())
