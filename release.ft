@@ -1,5 +1,6 @@
 ### Issue by Issue
 
+ * Upgrade Proof to 0.0.51. #56.
  * Upgrade Strata to 0.0.30. #52.
  * Use a `prove` named function in tests. #51.
  * Rename `step` to `async`. #50.
