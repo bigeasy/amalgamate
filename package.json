@@ -24,15 +24,16 @@
     "main":             "amalgamate",
     "dependencies":
     {
-                        "splice":             "0.0.7",
+                        "splice":             "0.0.11",
                         "twiddle":            "0.0.2"
     },
     "devDependencies":
     {
                         "proof":              "0.0.50",
-                        "b-tree":             "0.0.28",
-                        "designate":          "0.0.7",
-                        "skip":               "0.0.9",
+                        "b-tree":             "0.0.30",
+                        "rimraf":             "~2.2",
+                        "designate":          "0.0.9",
+                        "skip":               "0.0.12",
                         "revise":             "0.0.2"
     },
     "scripts":
