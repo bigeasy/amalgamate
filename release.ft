@@ -1,4 +1,5 @@
 ### Issue by Issue
 
+ * Remove `require.t.js`. #48.
  * Rename main module to `amalgamate.js`. #47.
  * Update license dates. #46.
