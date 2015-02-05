@@ -1,3 +1,4 @@
 ### Issue by Issue
 
+ * Rename main module to `amalgamate.js`. #47.
  * Update license dates. #46.

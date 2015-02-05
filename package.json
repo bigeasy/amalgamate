@@ -21,6 +21,7 @@
                         "type": "git",
                         "url": "http://github.com/bigeasy/amalgamate.git"
     },
+    "main":             "amalgamate",
     "dependencies":
     {
                         "splice":             "0.0.7",
