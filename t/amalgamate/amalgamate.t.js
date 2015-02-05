@@ -1,4 +1,6 @@
-require('./proof')(2, function (async, assert) {
+require('./proof')(2, prove)
+
+function prove (async, assert) {
     var amalgamate = require('../..')
     var designate = require('designate')
     var skip = require('skip')
@@ -66,4 +68,4 @@ require('./proof')(2, function (async, assert) {
             })(stratas.concat(primary))
         })
     })
-})
+}

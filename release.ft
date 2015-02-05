@@ -1,5 +1,6 @@
 ### Issue by Issue
 
+ * Use a `prove` named function in tests. #51.
  * Rename `step` to `async`. #50.
  * Upgrade Strata to 0.0.28. #49.
  * Remove `require.t.js`. #48.
