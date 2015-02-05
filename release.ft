@@ -1,5 +1,6 @@
 ### Issue by Issue
 
+ * Rename `step` to `async`. #50.
  * Upgrade Strata to 0.0.28. #49.
  * Remove `require.t.js`. #48.
  * Rename main module to `amalgamate.js`. #47.

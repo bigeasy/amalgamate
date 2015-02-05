@@ -1,4 +1,4 @@
-require('./proof')(2, function (step, assert) {
+require('./proof')(2, function (async, assert) {
     var amalgamate = require('../..')
     var designate = require('designate')
     var skip = require('skip')
@@ -14,12 +14,12 @@ require('./proof')(2, function (step, assert) {
         return a < b ? -1 : a > b ? 1 : 0
     }
     var names = 'primary one two three'.split(/\s+/)
-    step(function () {
-        names.forEach(step([], function (name) {
-            step(function () {
-                fs.mkdir(tmp + '/' + name, step())
+    async(function () {
+        names.forEach(async([], function (name) {
+            async(function () {
+                fs.mkdir(tmp + '/' + name, async())
             }, function () {
-                serialize(__dirname + '/fixtures/' + name + '.json', tmp + '/' + name, step())
+                serialize(__dirname + '/fixtures/' + name + '.json', tmp + '/' + name, async())
             }, function () {
                 var strata = new Strata({
                     extractor: revise.extractor(extractor),
@@ -27,8 +27,8 @@ require('./proof')(2, function (step, assert) {
                     leafSize: 3, branchSize: 3,
                     directory: tmp + '/' + name
                 })
-                step(function () {
-                    strata.open(step())
+                async(function () {
+                    strata.open(async())
                 }, function () {
                     return strata
                 })
@@ -36,23 +36,23 @@ require('./proof')(2, function (step, assert) {
         }))
     }, function (stratas) {
         var primary = stratas.shift()
-        step(function () {
+        async(function () {
             var versions = {}
             '0 1 2 3 4'.split(/\s/).forEach(function (version) {
                 versions[version] = true
             })
-            stratas.forEach(step([], function (strata) {
-                skip.forward(strata, comparator, versions, {}, 'a', step())
+            stratas.forEach(async([], function (strata) {
+                skip.forward(strata, comparator, versions, {}, 'a', async())
             }))
         }, function (iterators) {
-            designate.forward(comparator, function () { return false }, iterators, step())
+            designate.forward(comparator, function () { return false }, iterators, async())
         }, function (iterator) {
-            step(function () {
-                amalgamate(deleted, 0, primary, iterator, step())
+            async(function () {
+                amalgamate(deleted, 0, primary, iterator, async())
             }, function () {
-                iterator.unlock(step())
+                iterator.unlock(async())
             }, function () {
-                gather(primary, step())
+                gather(primary, async())
             })
         }, function (records) {
             var versions
@@ -61,8 +61,8 @@ require('./proof')(2, function (step, assert) {
             assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'i' ], 'records')
             assert(versions, [ 0, 0, 0, 0, 0, 0, 0, 0 ], 'versions')
         }, function () {
-            step(function (strata) {
-                strata.close(step())
+            async(function (strata) {
+                strata.close(async())
             })(stratas.concat(primary))
         })
     })
