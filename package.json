@@ -34,7 +34,7 @@
                         "rimraf":             "~2.2",
                         "designate":          "0.0.9",
                         "skip":               "0.0.12",
-                        "revise":             "0.0.2"
+                        "revise":             "0.0.4"
     },
     "scripts":
     {
