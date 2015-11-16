@@ -11,11 +11,7 @@
     "contributors":     [],
     "homepage":         "http://bigeasy.github.io/amalgamate",
     "bugs":             "https://github.com/bigeasy/amalgamate/issues",
-    "licenses":
-    [{
-                        "type": "MIT",
-                        "url": "http://github.com/bigeasy/amalgamate/raw/master/LICENSE"
-    }],
+    "license":          "MIT",
     "repository":
     {
                         "type": "git",
