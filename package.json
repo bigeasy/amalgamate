@@ -1,39 +1,46 @@
 {
-    "name":             "amalgamate",
-    "version":          "0.0.9",
-    "author":           "Alan Gutierrez <alan@prettyrobots.com>",
-    "description":      "Merge staging Strata b-trees containing MVCC versioned records into a primary Strata b-tree. ",
+    "name":                 "amalgamate",
+    "version":              "0.0.9",
+    "description":
+
+      "Merge staging Strata b-trees containing MVCC versioned records into a primary Strata b-tree. ",
+
     "keywords":
     [
-                        "btree", "leveldb", "levelup", "binary", "mvcc",
-                        "database", "json", "b-tree", "concurrent", "persistence"
+                            "btree", "leveldb", "levelup", "binary", "mvcc",
+                            "database", "json", "b-tree", "concurrent", "persistence"
     ],
-    "contributors":     [],
-    "homepage":         "http://bigeasy.github.io/amalgamate",
-    "bugs":             "https://github.com/bigeasy/amalgamate/issues",
-    "license":          "MIT",
+    "author":               "Alan Gutierrez <alan@prettyrobots.com>",
+    "contributors":         [],
+    "homepage":             "http://bigeasy.github.io/amalgamate",
+    "bugs":                 "https://github.com/bigeasy/amalgamate/issues",
+    "license":              "MIT",
     "repository":
     {
-                        "type": "git",
-                        "url": "http://github.com/bigeasy/amalgamate.git"
+                            "type": "git",
+                            "url": "bigeasy/amalgamate"
     },
-    "main":             "amalgamate",
     "dependencies":
     {
-                        "splice":             "0.0.13",
-                        "twiddle":            "0.0.3"
+                            "b-tree":                       "2.0.0-alpha.29",
+                            "designate":                    "2.0.0-alpha.3",
+                            "dilute":                       "2.0.0-alpha.2",
+                            "extant":                       "^1.0.20",
+                            "homogenize":                   "2.0.0-alpha.2",
+                            "interrupt":                    "^10.1.0",
+                            "riffle":                       "2.0.0-alpha.12",
+                            "rescue":                       "7.0.0-alpha.1",
+                            "splice":                       "3.0.0-alpha.6",
+                            "twiddle":                      "2.0.0-alpha.3"
     },
     "devDependencies":
     {
-                        "proof":              "0.0.56",
-                        "b-tree":             "0.0.30",
-                        "rimraf":             "2.4.3",
-                        "designate":          "0.0.9",
-                        "skip":               "0.0.12",
-                        "revise":             "0.0.4"
+                            "destructible":                 "7.0.0-alpha.6",
+                            "proof":                        "^9.0.2"
     },
+    "main":                 "amalgamate",
     "scripts":
     {
-                        "test": "proof platform win32 && proof test */*/*.t.js || t/test"
+                            "test": "proof test/*.t.js"
     }
 }
