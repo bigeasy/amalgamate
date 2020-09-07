@@ -334,8 +334,8 @@ class Amalgamator {
             [Symbol.asyncIterator]: function () {
                 return this
             },
-            next: function () {
-                const next = iterator.next()
+            next: async function () {
+                const next = await iterator.next()
                 if (next.done) {
                     this['return']()
                 }
@@ -383,7 +383,7 @@ class Amalgamator {
         await mvcc.splice(item => {
             return {
                 key: item.key.value,
-                parts: item.parts[0].header.method == 'put' ? item.parts.slice(1) : null
+                parts: item.parts[0].header.method == 'insert' ? item.parts.slice(1) : null
             }
         }, this._primary, designate)
         stage.amalgamated = true
@@ -403,7 +403,7 @@ class Amalgamator {
         }
     }
 
-    async _merge (version, operations, meta) {
+    async merge (version, operations, meta) {
         const stage = this._stages[0]
         stage.writers++
         const writes = {}

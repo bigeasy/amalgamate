@@ -1,4 +1,4 @@
-require('proof')(1, async okay => {
+require('proof')(2, async okay => {
     const path = require('path')
     const fs = require('fs').promises
 
@@ -41,8 +41,8 @@ require('proof')(1, async okay => {
         transformer: function (operation) {
             return {
                 method: operation.type == 'put' ? 'insert' : 'remove',
-                key: encode(operation.key),
-                value: ('value' in operation) ? encode(operation.value) : null
+                key: operation.key,
+                value: ('value' in operation) ? operation.value : null
             }
         },
         primary: {
@@ -57,8 +57,35 @@ require('proof')(1, async okay => {
     })
 
     await amalgamator.ready
+
+    const iterator = amalgamator.iterator({ 0: true }, 'forward', null, true)[Symbol.asyncIterator]()
+    okay(await iterator.next(), { done: true, value: null }, 'empty')
+
+    await amalgamator.merge(1n, [{
+        type: 'put',
+        key: Buffer.from('a'),
+        value: Buffer.from('A')
+    }, {
+        type: 'put',
+        key: Buffer.from('b'),
+        value: Buffer.from('B')
+    }, {
+        type: 'put',
+        key: Buffer.from('c'),
+        value: Buffer.from('C')
+    }, {
+        type: 'del',
+        key: Buffer.from('b')
+    }], 4)
+
+    const gather = []
+    for await (const items of amalgamator.iterator({ 0: true, 1: true }, 'forward', null, true)) {
+        for (const item of items) {
+            gather.push(item.parts[1].toString(), item.parts[2].toString())
+        }
+    }
+    okay(gather, [ 'a', 'A', 'c', 'C' ], 'forward iterator')
+
     destructible.destroy()
     await destructible.rejected
-
-    okay('done')
 })
