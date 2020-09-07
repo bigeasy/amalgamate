@@ -24,7 +24,7 @@
     {
                             "b-tree":                       "2.0.0-alpha.29",
                             "designate":                    "2.0.0-alpha.3",
-                            "dilute":                       "2.0.0-alpha.2",
+                            "dilute":                       "2.0.0-alpha.3",
                             "extant":                       "^1.0.20",
                             "homogenize":                   "2.0.0-alpha.2",
                             "interrupt":                    "^10.1.0",
