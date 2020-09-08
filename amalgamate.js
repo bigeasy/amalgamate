@@ -443,7 +443,6 @@ class Amalgamator {
         // A race to create the next stage, but the loser will merely create a stage
         // taht will be unused or little used.
         if (this._stages.length > 1)
-            console.log(this._stages[1].count, this._stages[1].writers, this._stages[1].amalgamated, this._stages.length)
         if (this._stages[0].count > this._maxStageCount && this._stages.length == 1) {
             const directory = path.join(this.directory, 'staging', this._filestamp())
             await fs.mkdir(directory, { recursive: true })
