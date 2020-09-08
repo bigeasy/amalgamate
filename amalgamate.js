@@ -1,6 +1,7 @@
 // Node.js API.
 const path = require('path')
 const fs = require('fs').promises
+const assert = require('assert')
 
 // Handle or rethrow exceptions based on exception properties.
 const rescue = require('rescue')
@@ -88,6 +89,7 @@ class Amalgamator {
         this._destructible = {
             root: destructible,
             amalgamate: destructible.durable('amalgamate'),
+            unstage: destructible.durable('amalgamate'),
             strata: destructible.durable('strata')
         }
         this._destructible.strata.increment()
@@ -134,8 +136,8 @@ class Amalgamator {
         this._destructible.root.destruct(() => {
             this._open = false
             this._destructible.root.ephemeral('shutdown', async () => {
-                await this._destructible.amalgamate.destructed
-                this._destructible.strata.destroy()
+                await this._destructible.amalgamate.destroy().destructed
+                this._destructible.strata.decrement()
                 await this._destructible.strata.destructed
                 this._cache.purge(0)
             })
@@ -349,7 +351,7 @@ class Amalgamator {
 
     async _unstage () {
         const stage = this._stages.pop()
-        await stage.strata.close()
+        await stage.strata.destructible.destroy().destructed
         // TODO Implement Strata.options.directory.
         await fs.rmdir(stage.path, { recursive: true })
         this._maybeUnstage()
@@ -359,7 +361,7 @@ class Amalgamator {
         if (this._open && this._stages.length > 1) {
             const stage = this._stages[this._stages.length - 1]
             if (stage.amalgamated && stage.readers == 0) {
-                this._destructible.amalgamated.ephemeral([ 'unstage', stage.path ], this._unstage())
+                this._destructible.unstage.ephemeral([ 'unstage', stage.path ], this._unstage())
             }
         }
     }
@@ -376,10 +378,16 @@ class Amalgamator {
     async _amalgamate () {
         const stage = this._stages[this._stages.length - 1]
         assert.equal(stage.writers, 0)
-        const riffle = mvcc.riffle.forward(stage.strata, Strata.MIN)
-        // TODO Track versions in stage.
-        throw new Error
-        const designate = mvcc.designate.forward(this._comparator.primary, riffle, stage.versions)
+        const riffle = mvcc.riffle.forward(stage.strata, Strata.MIN)[Symbol.asyncIterator]()
+        const working = {
+            [Symbol.asyncIterator]: function () { return this },
+            next: async () => {
+                const next = riffle.next()
+                this._destructible.amalgamate.working()
+                return next
+            }
+        }
+        const designate = mvcc.designate.forward(this._comparator.primary, working, stage.versions)
         await mvcc.splice(item => {
             return {
                 key: item.key.value,
@@ -441,7 +449,7 @@ class Amalgamator {
             await next.strata.create()
             this._stages.unshift(next)
         }
-        // this._maybeAmalgamate()
+        this._maybeAmalgamate()
     }
 }
 
