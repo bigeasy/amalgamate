@@ -294,6 +294,7 @@ class Amalgamator {
         const stages = this._stages.filter(stage => ! stage.amalgamated)
 
         stages.forEach(stage => stage.readers++)
+                assert(stages.every(stage => stage.readers != 0))
 
         // If we are exclusive we will use a maximum version going forward and a
         // minimum version going backward, puts us where we'd expect to be if we
@@ -344,7 +345,7 @@ class Amalgamator {
                 return next
             },
             'return': function () {
-                stages.forEach(stage => stage.readers--)
+                stages.splice(0).forEach(stage => stage.readers--)
             }
         }
     }
@@ -399,7 +400,7 @@ class Amalgamator {
     }
 
     _maybeAmalgamate () {
-        if (this._open && this._stages.length == 2) {
+        if (this._open && this._stages.length > 1) {
             const stage = this._stages[this._stages.length - 1]
             if (!stage.amalgamated && stage.writers == 0) {
                 this._destructible.amalgamate.ephemeral('amalgamate', async () => {
@@ -441,7 +442,9 @@ class Amalgamator {
         stage.writers--
         // A race to create the next stage, but the loser will merely create a stage
         // taht will be unused or little used.
-        if (this._stages[0].count > this._maxStageCount && this._stages.length != 2) {
+        if (this._stages.length > 1)
+            console.log(this._stages[1].count, this._stages[1].writers, this._stages[1].amalgamated, this._stages.length)
+        if (this._stages[0].count > this._maxStageCount && this._stages.length == 1) {
             const directory = path.join(this.directory, 'staging', this._filestamp())
             await fs.mkdir(directory, { recursive: true })
             const next = this._newStage(directory, {})
@@ -449,6 +452,7 @@ class Amalgamator {
             this._stages.unshift(next)
         }
         this._maybeAmalgamate()
+        this._maybeUnstage()
     }
 }
 
