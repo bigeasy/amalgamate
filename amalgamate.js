@@ -67,6 +67,7 @@ class Amalgamator {
 
     //
     constructor (destructible, options) {
+        this.destructible = destructible
         // Directory in which the data for this index is stored.
         this.directory = options.directory
         // For staging we wrap the application key comparator in a comparator
@@ -87,7 +88,6 @@ class Amalgamator {
         // able to open and close, and we have an open and close method. Do we
         // want to use destructible constructs?
         this._destructible = {
-            root: destructible,
             amalgamate: destructible.durable('amalgamate'),
             unstage: destructible.durable('amalgamate'),
             strata: destructible.durable('strata')
@@ -133,9 +133,9 @@ class Amalgamator {
                 }
             }
         }
-        this._destructible.root.destruct(() => {
+        destructible.destruct(() => {
             this._open = false
-            this._destructible.root.ephemeral('shutdown', async () => {
+            destructible.ephemeral('shutdown', async () => {
                 await this._destructible.amalgamate.destroy().destructed
                 this._destructible.strata.decrement()
                 await this._destructible.strata.destructed
