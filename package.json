@@ -28,8 +28,8 @@
                             "extant":                       "^1.0.20",
                             "homogenize":                   "2.0.0-alpha.2",
                             "interrupt":                    "^10.1.0",
-                            "riffle":                       "2.0.0-alpha.13",
                             "rescue":                       "7.0.0-alpha.1",
+                            "riffle":                       "2.0.0-alpha.13",
                             "splice":                       "3.0.0-alpha.7",
                             "twiddle":                      "2.0.0-alpha.3"
     },
