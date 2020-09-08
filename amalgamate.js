@@ -401,10 +401,9 @@ class Amalgamator {
     _maybeAmalgamate () {
         if (this._open && this._stages.length == 2) {
             const stage = this._stages[this._stages.length - 1]
-            if (stage.appending && stage.writers == 0) {
+            if (!stage.amalgamated && stage.writers == 0) {
                 this._destructible.amalgamate.ephemeral('amalgamate', async () => {
                     await this._amalgamate()
-                    this._maybeUnstage()
                     this._maybeAmalgamate()
                 })
             }
