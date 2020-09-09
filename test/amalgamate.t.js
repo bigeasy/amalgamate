@@ -18,6 +18,15 @@ require('proof')(2, async okay => {
         comparator: Buffer.compare,
         createIfMissing: true,
         errorIfExists: false,
+        key: {
+            compare: Buffer.compare,
+            serialize: function (key) {
+                return [ key ]
+            },
+            deserialize: function (parts) {
+                return parts[0]
+            }
+        },
         header: {
             compose: function (version, method, index, count) {
                 return { header: { method, index }, count, version }
@@ -37,6 +46,10 @@ require('proof')(2, async okay => {
                 header.version = BigInt(header.version)
                 return header
             }
+        },
+        parts: {
+            serialize: function (parts) { return parts },
+            deserialize: function (parts) { return parts }
         },
         transformer: function (operation) {
             return {

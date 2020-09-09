@@ -77,8 +77,8 @@ class Amalgamator {
         // TODO If we handle multple batches with the same version, someone
         // needs to maintain the index externally.
         this._comparator = {
-            primary: options.comparator,
-            stage: ascension([ options.comparator, BigInt, Number ], function (object) {
+            primary: options.key.compare,
+            stage: ascension([ options.key.compare, BigInt, Number ], function (object) {
                 return [ object.value, object.version, object.index ]
             })
         }
@@ -111,6 +111,8 @@ class Amalgamator {
         const primary = coalesce(options.primary, {})
         const leaf = { stage: coalesce(stage.leaf, {}), primary: coalesce(primary.leaf, {}) }
         const branch = { stage: coalesce(stage.branch, {}), primary: coalesce(primary.branch, {}) }
+        this._parts = options.parts
+        this._key = options.key
         this._strata = {
             stage: {
                 leaf: {
@@ -162,22 +164,30 @@ class Amalgamator {
             cache: this._cache,
             serializer: {
                 key: {
-                    serialize: function ({ value, version, index }) {
+                    serialize: ({ value, version, index }) => {
                         const header = { version: version.toString(), index }
                         const buffer = Buffer.from(JSON.stringify(header))
-                        return [ buffer, value ]
+                        return [ buffer ].concat(this._key.serialize(value))
                     },
-                    deserialize: function (parts) {
+                    deserialize: (parts) => {
                         const { version, index } = JSON.parse(parts[0].toString())
-                        return { value: parts[1], version: BigInt(version), index }
+                        return {
+                            value: this._key.deserialize(parts.slice(1)),
+                            version: BigInt(version),
+                            index: index
+                        }
                     }
                 },
                 parts: {
-                    serialize: function (parts) {
-                        return [ header.serialize(parts[0]) ].concat(parts.slice(1))
+                    serialize: (parts) => {
+                        return [
+                            header.serialize(parts[0])
+                        ].concat(this._parts.serialize(parts.slice(1)))
                     },
                     deserialize: function (parts) {
-                        return [ header.deserialize(parts[0]) ].concat(parts.slice(1))
+                        return [
+                            header.deserialize(parts[0])
+                        ].concat(options.parts.deserialize(parts.slice(1)))
                     }
                 }
             },
