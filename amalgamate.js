@@ -93,10 +93,12 @@ class Amalgamator {
             strata: destructible.durable('strata')
         }
         this._destructible.strata.increment()
+        // Ensure only one rotate at a time.
+        this._rotating = false
         // The Strata b-tree cache to use to store pages.
         this._cache = options.cache
         // The primary tree.
-        this._primary = null
+        this.strata = null
         // The staging trees.
         this._stages = []
         // Header serialization.
@@ -271,7 +273,7 @@ class Amalgamator {
             }
             // TODO Either use destructible correctly or bring it internal to
             // Strata.
-            this._primary = new Strata(this._destructible.strata.durable('primary'), {
+            this.strata = new Strata(this._destructible.strata.durable('primary'), {
                 directory: path.join(this.directory, 'primary'),
                 cache: this._cache,
                 comparator: this._comparator.primary,
@@ -280,9 +282,9 @@ class Amalgamator {
                 leaf: this._strata.primary.leaf
             })
             if ((await fs.readdir(path.join(this.directory, 'primary'))).length != 0) {
-                await this._primary.open()
+                await this.strata.open()
             } else {
-                await this._primary.create()
+                await this.strata.create()
             }
             const staging = path.join(this.directory, 'staging')
             for (const file of await fs.readdir(staging)) {
@@ -300,7 +302,24 @@ class Amalgamator {
         }
     }
 
-    iterator (versions, direction, key, inclusive) {
+    iterator (versions, directory, key, inclusive) {
+        return this._iterator(versions, directory, key, inclusive)
+    }
+
+    // `riffled` is the stage that a `Mutator` is currently merging into. The
+    // object returned from this function has a `riffles` number property. When
+    // the next slice of records is obtained from the riffled stage, the
+    // `riffles` property is incremented. This is to let the caller track when
+    // the merged records will be returned by an iterator.
+    //
+    // This is used by Memento to know when it can discard an in-memory stage an
+    // no longer merge messages from the in-memory stage into the results from
+    // the asynchronous iterator. It will take two increments after a
+    // `Mutator.merge` to know that the iterator is returning the results of a
+    // merge.
+
+    //
+    _iterator (versions, direction, key, inclusive, riffled = null) {
         const stages = this._stages.filter(stage => ! stage.amalgamated)
 
         stages.forEach(stage => stage.readers++)
@@ -320,35 +339,44 @@ class Amalgamator {
                 : Strata.MAX
         const compound = typeof versioned == 'symbol' ? versioned : versioned.value
 
-        const riffle = mvcc.riffle[direction](this._primary, compound, 32, inclusive)
-        const primary = mvcc.twiddle(riffle, item => {
+        const riffle = mvcc.riffle[direction](this.strata, compound, 32, inclusive)
+        const primary = mvcc.twiddle(riffle, items => {
             // TODO Looks like I'm in the habit of adding extra stuff, meta stuff,
             // so the records, so go back and ensure that I'm allowing this,
             // forwarding the meta information.
-            return {
-                key: { value: item.parts[0], version: 0n, index: 0 },
-                parts: [{
-                    header: { method: 'put' },
-                    version: 0n
-                }, item.parts[0], item.parts[1]]
-            }
+            return items.map(item => {
+                return {
+                    key: { value: item.parts[0], version: 0n, index: 0 },
+                    parts: [{
+                        header: { method: 'put' },
+                        version: 0n
+                    }, item.parts[0], item.parts[1]]
+                }
+            })
         })
 
         const riffles = this._stages.map(stage => {
-            return mvcc.riffle[direction](stage.strata, versioned, 32, inclusive)
+            const riffle = mvcc.riffle[direction](stage.strata, versioned, 32, inclusive)
+            if (riffled === stage) {
+                return mvcc.twiddle(riffle, items => {
+                    iterator.riffles++
+                    return items
+                })
+            }
+            return riffle
         })
         const homogenize = mvcc.homogenize[direction](this._comparator.stage, riffles.concat(primary))
         const designate = mvcc.designate[direction](this._comparator.primary, homogenize, versions)
         const dilute = mvcc.dilute(designate, item => {
             return item.parts[0].header.method == 'remove' ? -1 : 0
-        })
-        const iterator = dilute[Symbol.asyncIterator]()
-        return {
+        })[Symbol.asyncIterator]()
+        const iterator = {
             [Symbol.asyncIterator]: function () {
                 return this
             },
+            riffles: 0,
             next: async function () {
-                const next = await iterator.next()
+                const next = await dilute.next()
                 if (next.done) {
                     this['return']()
                 }
@@ -358,6 +386,7 @@ class Amalgamator {
                 stages.splice(0).forEach(stage => stage.readers--)
             }
         }
+        return iterator
     }
 
     async _unstage () {
@@ -404,7 +433,7 @@ class Amalgamator {
                 key: item.key.value,
                 parts: item.parts[0].header.method == 'insert' ? item.parts.slice(1) : null
             }
-        }, this._primary, designate)
+        }, this.strata, designate)
         stage.amalgamated = true
         this._maybeUnstage()
     }
@@ -422,6 +451,12 @@ class Amalgamator {
     }
 
     async merge (version, operations, meta) {
+        const mutator = this.mutator(version)
+        await mutator.merge(operations, meta)
+        mutator.commit()
+    }
+
+    async _merge (version, operations, meta) {
         const stage = this._stages[0]
         stage.writers++
         const writes = {}
@@ -461,6 +496,91 @@ class Amalgamator {
         }
         this._maybeAmalgamate()
         this._maybeUnstage()
+    }
+
+    mutator (version) {
+        return new Mutator(this, version)
+    }
+
+    _maybeNewStage () {
+        // A race to create the next stage, but the loser will merely create a stage
+        // taht will be unused or little used.
+        if (
+            ! this._rotating &&
+            this._stages[0].count > this._maxStageCount &&
+            this._stages.length == 1
+        ) {
+            this._rotating = true
+            this._destructible.amalgamate.ephemeral('rotate', async () => {
+                const directory = path.join(this.directory, 'staging', this._filestamp())
+                await fs.mkdir(directory, { recursive: true })
+                const next = this._newStage(directory, {})
+                await next.strata.create()
+                this._stages.unshift(next)
+                this._rotating = false
+            })
+        }
+        this._maybeAmalgamate()
+        this._maybeUnstage()
+    }
+}
+
+class Mutator {
+    constructor (amalgamator, version) {
+        this._amalgamator = amalgamator
+        this._version = version
+        this._stage = amalgamator._stages[0]
+        this._stage.writers++
+    }
+
+    iterator (versions, direction, key, inclusive) {
+        return this._amalgamator._iterator(versions, direction, key, inclusive, this._stage)
+    }
+
+    async merge (operations, meta) {
+        const {
+            _amalgamator: { _transformer: transformer, _header: { compose } },
+            _stage: stage,
+            _version: version
+        } = this, writes = {}
+        stage.writers++
+        let cursor = Strata.nullCursor(), found, index = 0, i = 0
+        for (const operation of operations) {
+            const { method, key, value } = transformer(operation)
+            const compound = { value: key, version, index: i }
+            for (;;) {
+                ; ({ index, found } = cursor.indexOf(compound, cursor.page.ghosts))
+                if (index != null) {
+                    break
+                }
+                cursor.release()
+                cursor = await stage.strata.search(compound)
+            }
+            const header = compose(version, method, i, meta)
+            if (method == 'insert') {
+                cursor.insert(index, compound, [ header, key, value ], writes)
+            } else {
+                cursor.insert(index, compound, [ header, key ], writes)
+            }
+            stage.count++
+            i++
+        }
+        cursor.release()
+        await Strata.flush(writes)
+    }
+
+    commit () {
+        this._stage.versions[this._version] = true
+        this._release()
+    }
+
+    rollback () {
+        this._release()
+    }
+
+    _release () {
+        this._stage.writers--
+        this._amalgamator._maybeNewStage()
     }
 }
 
