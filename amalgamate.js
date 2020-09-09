@@ -184,10 +184,10 @@ class Amalgamator {
                             header.serialize(parts[0])
                         ].concat(this._parts.serialize(parts.slice(1)))
                     },
-                    deserialize: function (parts) {
+                    deserialize: (parts) => {
                         return [
                             header.deserialize(parts[0])
-                        ].concat(options.parts.deserialize(parts.slice(1)))
+                        ].concat(this._parts.deserialize(parts.slice(1)))
                     }
                 }
             },
