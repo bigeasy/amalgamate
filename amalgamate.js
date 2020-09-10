@@ -33,6 +33,22 @@ const mvcc = {
 // A `async`/`await` durable b-tree.
 const Strata = require('b-tree')
 
+// Reference counts are kept in an array where the reference count is indexed by
+// the position of the stage in the stage array at the time the reference was
+// taken. We can merge a stage into the primary tree when it is no longer in the
+// zero position of the stage array and the reference count in the zero position
+// of the reference array reaches zero. Obviously, the reference count in the
+// zero position of the reference array will not increase from zero after the
+// has been shifted out of the zero position of the stage array. The reference
+// count is not based on readers or writers, but the position. Writers do not
+// want the zero position to stage to be merged because they are still writing
+// to it. Readers do not want the zero position stage to be merged because they
+// may be reading only a subset of the versions for that stage. When the stage
+// is merged the version will be changed to zero and unless they stage has a
+// version that overrides the zero, the new value will be returned from a
+// reader, ruining the isolation.
+
+//
 class Amalgamator {
     static Error = Interrupt.create('Amalgamator.Error')
 
@@ -223,9 +239,12 @@ class Amalgamator {
             comparator: this._comparator.stage
         })
         return {
-            strata, path: directory, versions: { 0: true },
-            appending: true, amalgamated: false,
-            writers: 0, readers: 0, count: 0
+            strata, path: directory,
+            versions: { 0: true },
+            appending: true,
+            amalgamated: false,
+            count: 0,
+            references: [ 0, 0 ]
         }
     }
 
@@ -322,8 +341,8 @@ class Amalgamator {
     _iterator (versions, direction, key, inclusive, riffled = null) {
         const stages = this._stages.filter(stage => ! stage.amalgamated)
 
-        stages.forEach(stage => stage.readers++)
-                assert(stages.every(stage => stage.readers != 0))
+        stages.forEach((stage, index) => stage.references[index]++)
+        assert(stages.every(stage => stage.references.every(count => ! isNaN(count))))
 
         // If we are exclusive we will use a maximum version going forward and a
         // minimum version going backward, puts us where we'd expect to be if we
@@ -383,7 +402,7 @@ class Amalgamator {
                 return next
             },
             'return': function () {
-                stages.splice(0).forEach(stage => stage.readers--)
+                stages.splice(0).forEach((stage, index) => stage.references[index]--)
             }
         }
         return iterator
@@ -400,24 +419,15 @@ class Amalgamator {
     _maybeUnstage () {
         if (this._open && this._stages.length > 1) {
             const stage = this._stages[this._stages.length - 1]
-            if (stage.amalgamated && stage.readers == 0) {
+            if (stage.amalgamated && stage.references.reduce((sum, value) => sum + value, 0) == 0) {
                 this._destructible.unstage.ephemeral([ 'unstage', stage.path ], this._unstage())
             }
         }
     }
 
-    // TODO What makes me think that all of these entries are any good? In fact, if
-    // we've failed while writing a log, then loading the leaf is going to start to
-    // play the entries of the failed transaction. We need a player that is going to
-    // save up the entries, and then play them as batches, if the batch has a
-    // comment record attached to it. Then we know that our log here is indeed the
-    // latest and greatest.
-    //
-    // Another problem is that the code below will insert the records with their
-    // logged version, instead of converting those verisons to zero.
     async _amalgamate () {
         const stage = this._stages[this._stages.length - 1]
-        assert.equal(stage.writers, 0)
+        assert.equal(stage.references.reduce((sum, value) => sum + value), 0)
         const riffle = mvcc.riffle.forward(stage.strata, Strata.MIN)[Symbol.asyncIterator]()
         const working = {
             [Symbol.asyncIterator]: function () { return this },
@@ -441,7 +451,7 @@ class Amalgamator {
     _maybeAmalgamate () {
         if (this._open && this._stages.length > 1) {
             const stage = this._stages[this._stages.length - 1]
-            if (!stage.amalgamated && stage.writers == 0) {
+            if (!stage.amalgamated && stage.references[0] == 0) {
                 this._destructible.amalgamate.ephemeral('amalgamate', async () => {
                     await this._amalgamate()
                     this._maybeAmalgamate()
@@ -454,48 +464,6 @@ class Amalgamator {
         const mutator = this.mutator(version)
         await mutator.merge(operations, meta)
         mutator.commit()
-    }
-
-    async _merge (version, operations, meta) {
-        const stage = this._stages[0]
-        stage.writers++
-        const writes = {}
-        let cursor = Strata.nullCursor(), found, index = 0, i = 0
-        for (const operation of operations) {
-            const { method, key, value } = this._transformer(operation)
-            const compound = { value: key, version, index: i }
-            for (;;) {
-                ; ({ index, found } = cursor.indexOf(compound, cursor.page.ghosts))
-                if (index != null) {
-                    break
-                }
-                cursor.release()
-                cursor = await stage.strata.search(compound)
-            }
-            const header = this._header.compose(version, method, i, meta)
-            if (method == 'insert') {
-                cursor.insert(index, compound, [ header, key, value ], writes)
-            } else {
-                cursor.insert(index, compound, [ header, key ], writes)
-            }
-            stage.count++
-            i++
-        }
-        cursor.release()
-        await Strata.flush(writes)
-        stage.versions[version] = true
-        stage.writers--
-        // A race to create the next stage, but the loser will merely create a stage
-        // taht will be unused or little used.
-        if (this._stages[0].count > this._maxStageCount && this._stages.length == 1) {
-            const directory = path.join(this.directory, 'staging', this._filestamp())
-            await fs.mkdir(directory, { recursive: true })
-            const next = this._newStage(directory, {})
-            await next.strata.create()
-            this._stages.unshift(next)
-        }
-        this._maybeAmalgamate()
-        this._maybeUnstage()
     }
 
     mutator (version) {
@@ -530,7 +498,7 @@ class Mutator {
         this._amalgamator = amalgamator
         this._version = version
         this._stage = amalgamator._stages[0]
-        this._stage.writers++
+        this._stage.references[0]++
     }
 
     iterator (versions, direction, key, inclusive) {
@@ -543,7 +511,6 @@ class Mutator {
             _stage: stage,
             _version: version
         } = this, writes = {}
-        stage.writers++
         let cursor = Strata.nullCursor(), found, index = 0, i = 0
         for (const operation of operations) {
             const { method, key, value } = transformer(operation)
@@ -579,7 +546,7 @@ class Mutator {
     }
 
     _release () {
-        this._stage.writers--
+        this._stage.references[0]--
         this._amalgamator._maybeNewStage()
     }
 }
