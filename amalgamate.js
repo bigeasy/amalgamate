@@ -375,23 +375,23 @@ class Amalgamator {
         })
 
         const riffles = this._stages.map(stage => {
-            const resumable = riffle === stage
+            const resumable = riffled === stage
             const riffle = mvcc.riffle[direction](stage.strata, versioned, {
                 slice: 32, inclusive: inclusive, resumable: resumable
             })
-            if (riffled === stage) {
+            if (resumable) {
                 return mvcc.twiddle(riffle, items => {
                     iterator.riffles++
                     return items
                 })
             }
             return riffle
-        })
-        const homogenize = mvcc.homogenize[direction](this._comparator.stage, riffles.concat(primary))
+        }).concat(primary)
+        const homogenize = mvcc.homogenize[direction](this._comparator.stage, riffles)
         const designate = mvcc.designate[direction](this._comparator.primary, homogenize, versions)
         const dilute = mvcc.dilute(designate, item => {
             return item.parts[0].header.method == 'remove' ? -1 : 0
-        })[Symbol.asyncIterator]()
+        })
         const iterator = {
             [Symbol.asyncIterator]: function () {
                 return this
