@@ -375,7 +375,10 @@ class Amalgamator {
         })
 
         const riffles = this._stages.map(stage => {
-            const riffle = mvcc.riffle[direction](stage.strata, versioned, 32, inclusive)
+            const resumable = riffle === stage
+            const riffle = mvcc.riffle[direction](stage.strata, versioned, {
+                slice: 32, inclusive: inclusive, resumable: resumable
+            })
             if (riffled === stage) {
                 return mvcc.twiddle(riffle, items => {
                     iterator.riffles++
