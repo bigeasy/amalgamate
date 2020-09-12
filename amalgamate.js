@@ -321,24 +321,7 @@ class Amalgamator {
         }
     }
 
-    iterator (versions, directory, key, inclusive) {
-        return this._iterator(versions, directory, key, inclusive)
-    }
-
-    // `riffled` is the stage that a `Mutator` is currently merging into. The
-    // object returned from this function has a `riffles` number property. When
-    // the next slice of records is obtained from the riffled stage, the
-    // `riffles` property is incremented. This is to let the caller track when
-    // the merged records will be returned by an iterator.
-    //
-    // This is used by Memento to know when it can discard an in-memory stage an
-    // no longer merge messages from the in-memory stage into the results from
-    // the asynchronous iterator. It will take two increments after a
-    // `Mutator.merge` to know that the iterator is returning the results of a
-    // merge.
-
-    //
-    _iterator (versions, direction, key, inclusive, riffled = null) {
+    iterator (versions, direction, key, inclusive) {
         const stages = this._stages.filter(stage => ! stage.amalgamated)
 
         stages.forEach((stage, index) => stage.references[index]++)
@@ -375,17 +358,9 @@ class Amalgamator {
         })
 
         const riffles = this._stages.map(stage => {
-            const resumable = riffled === stage
-            const riffle = mvcc.riffle[direction](stage.strata, versioned, {
-                slice: 32, inclusive: inclusive, resumable: resumable
+            return mvcc.riffle[direction](stage.strata, versioned, {
+                slice: 32, inclusive: inclusive
             })
-            if (resumable) {
-                return mvcc.twiddle(riffle, items => {
-                    iterator.riffles++
-                    return items
-                })
-            }
-            return riffle
         }).concat(primary)
         const homogenize = mvcc.homogenize[direction](this._comparator.stage, riffles)
         const designate = mvcc.designate[direction](this._comparator.primary, homogenize, versions)
@@ -502,10 +477,6 @@ class Mutator {
         this._version = version
         this._stage = amalgamator._stages[0]
         this._stage.references[0]++
-    }
-
-    iterator (versions, direction, key, inclusive) {
-        return this._amalgamator._iterator(versions, direction, key, inclusive, this._stage)
     }
 
     async merge (operations, meta) {
