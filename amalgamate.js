@@ -121,6 +121,8 @@ class Amalgamator {
         this._header = options.header
         // True when opening has completed.
         this.ready = new Promise(resolve => this._ready = resolve)
+        // Extract a key from the record.
+        this.extractor = options.extractor
         // Number of records in a staging tree after which the tree is merged
         // into the primary tree.
         const stage = coalesce(options.stage, {})
@@ -234,7 +236,11 @@ class Amalgamator {
                 }
             },
             extractor: function (parts) {
-                return { value: parts[1], version: parts[0].version, index: parts[0].header.index }
+                return {
+                    value: this.extractor(parts.slice(1)),
+                    version: parts[0].version,
+                    index: parts[0].header.index
+                }
             },
             comparator: this._comparator.stage
         })
@@ -298,7 +304,8 @@ class Amalgamator {
                 comparator: this._comparator.primary,
                 serializer: 'buffer',
                 branch: this._strata.primary.branch,
-                leaf: this._strata.primary.leaf
+                leaf: this._strata.primary.leaf,
+                extractor: this.extractor
             })
             if ((await fs.readdir(path.join(this.directory, 'primary'))).length != 0) {
                 await this.strata.open()
