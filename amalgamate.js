@@ -321,7 +321,7 @@ class Amalgamator {
         }
     }
 
-    iterator (versions, direction, key, inclusive) {
+    iterator (versions, direction, key, inclusive, additional = []) {
         const stages = this._stages.filter(stage => ! stage.amalgamated)
 
         stages.forEach((stage, index) => stage.references[index]++)
@@ -361,7 +361,7 @@ class Amalgamator {
             return mvcc.riffle[direction](stage.strata, versioned, {
                 slice: 32, inclusive: inclusive
             })
-        }).concat(primary)
+        }).concat(primary).concat(additional)
         const homogenize = mvcc.homogenize[direction](this._comparator.stage, riffles)
         const designate = mvcc.designate[direction](this._comparator.primary, homogenize, versions)
         const dilute = mvcc.dilute(designate, item => {
