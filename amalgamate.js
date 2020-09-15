@@ -94,7 +94,7 @@ class Amalgamator {
         // needs to maintain the index externally.
         this._comparator = {
             primary: options.key.compare,
-            stage: ascension([ options.key.compare, BigInt, Number ], function (object) {
+            stage: ascension([ options.key.compare, Number, Number ], function (object) {
                 return [ object.value, object.version, object.index ]
             })
         }
@@ -122,7 +122,7 @@ class Amalgamator {
         // True when opening has completed.
         this.ready = new Promise(resolve => this._ready = resolve)
         // Extract a key from the record.
-        this.extractor = options.extractor
+        this.extractor = options.key.extractor
         // Number of records in a staging tree after which the tree is merged
         // into the primary tree.
         const stage = coalesce(options.stage, {})
@@ -182,6 +182,13 @@ class Amalgamator {
             branch: this._strata.stage.branch,
             leaf: this._strata.stage.leaf,
             cache: this._cache,
+            // Meta information is used for merge and that is the thing we're
+            // calling a header. The key's in branches will not need meta
+            // information so we'll be able to serialize it without any
+            // assistance from the user. I've wanted to serialize as binary, but
+            // really I don't see what's wrong with JSON and it makes the files
+            // human readable. Revisit with performance testing if you're
+            // searching for optimizations.
             serializer: {
                 key: {
                     serialize: ({ value, version, index }) => {
@@ -193,45 +200,62 @@ class Amalgamator {
                         const { version, index } = JSON.parse(parts[0].toString())
                         return {
                             value: this._key.deserialize(parts.slice(1)),
-                            version: BigInt(version),
+                            version: version,
                             index: index
                         }
                     }
                 },
+                // A memorable moment. Included in the header is the count of
+                // operations given to `merge`. This is only useful when `merge`
+                // is used once per version. Upon reopening the data store you
+                // can scan a stage to see if the count of operations in the
+                // header matches the number of operations on disk. If so, the
+                // version is valid and can be added to the set of valid
+                // versions. This is wasteful, however. The count is repeated in
+                // every record, but I assume that given the `put` method of
+                // LevelDB, inserting a single record per verison is a common
+                // case, in which case the count is not wasteful it all. It is
+                // economical to tuck it into the header.
+                //
+                // But, for Memento and IndexedDB where `merge` will be called
+                // multiple times it is not useful at all. Ideally we would make
+                // this configurable so that such databases wouldn't pay that
+                // price, either with a `count` switch or by having the user
+                // determine what should go in the header and how it should be
+                // serialized.
+                //
+                // I don't want to document the former and I don't want to have
+                // to type out the latter in each dependent project.
+                //
+                // And to dispell a brainstorm I've having at the time of
+                // writing – you cannot have some sort of cummulative count that
+                // is any use to a multi-`merge` database. You cannot record a
+                // count of three and when you get a new merge of four items
+                // record a count of seven. How do you know of the transition
+                // from three to seven if there is a failure before the first
+                // record with a count of seven is written? The three items will
+                // look valid and a partial write will be committed.
+                //
+                // And for all that, I found a compromise so that `count` won't
+                // be added when the user creates a `Mutator` instead of calling
+                // `Amalgamator.merge()`, but I'm sure I'll revisit this and
+                // wring my hands over whether the header should be binary.
+
+                //
                 parts: {
                     serialize: (parts) => {
-                        return [
-                            header.serialize(parts[0])
-                        ].concat(this._parts.serialize(parts.slice(1)))
+                        const header = Buffer.from(JSON.stringify(parts[0]))
+                        if (parts[0].method == 'insert') {
+                            return [ header ].concat(this._parts.serialize(parts.slice(1)))
+                        }
+                        return [ header ].concat(this._key.serialize(parts[1]))
                     },
                     deserialize: (parts) => {
-                        return [
-                            header.deserialize(parts[0])
-                        ].concat(this._parts.deserialize(parts.slice(1)))
-                    }
-                }
-            },
-            _serializer: {
-                key: {
-                    serialize: function ({ value, version, index }) {
-                        const header = { version, index }
-                        const buffer = Buffer.alloc(packet.key.sizeof(header))
-                        packet.key.serialize(header, buffer, 0)
-                        return [ buffer, value ]
-                    },
-                    deserialize: function (parts) {
-                        const { version, index } = packet.key.parse(parts[0], 0)
-                        return { value: parts[1], version, index }
-                    }
-                },
-                parts: {
-                    serialize: function (parts) {
-                        const buffer = Buffer.alloc(packet.meta.sizeof(parts[0]))
-                        packet.meta.serialize(parts[0], buffer, 0)
-                        return [ buffer ].concat(parts.slice(1))
-                    },
-                    deserialize: function (parts) {
-                        return [ packet.meta.parse(parts[0], 0) ].concat(parts.slice(1))
+                        const header = JSON.parse(parts[0].toString())
+                        if (header.method == 'insert') {
+                            return [ header, this._parts.deserialize(parts.slice(1)) ]
+                        }
+                        return [ header ].concat(this._key.deserialize(parts.slice(1)))
                     }
                 }
             },
@@ -263,7 +287,7 @@ class Amalgamator {
             let exists = true
             this._versions = { 0: true }
             // Must be one, version zero must only come out of the primary tree.
-            this._version = 1n
+            this._version = 1
             const files = await (async () => {
                 for (;;) {
                     try {
@@ -338,8 +362,8 @@ class Amalgamator {
         // minimum version going backward, puts us where we'd expect to be if we
         // where doing exclusive with the external key only.
         const version = direction == 'forward'
-            ? inclusive ? 0n : 0xffffffffffffffffn
-            : inclusive ? 0xffffffffffffffffn : 0n
+            ? inclusive ? 0 : Number.MAX_SAFE_INTEGER
+            : inclusive ? Number.MAX_SAFE_INTEGER : 0
         // TODO Not sure what no key plus exclusive means.
         const versioned = key != null
             ? { value: key, version: version }
@@ -355,10 +379,10 @@ class Amalgamator {
             // forwarding the meta information.
             return items.map(item => {
                 return {
-                    key: { value: item.parts[0], version: 0n, index: 0 },
+                    key: { value: item.parts[0], version: 0, index: 0 },
                     parts: [{
                         header: { method: 'put' },
-                        version: 0n
+                        version: 0
                     }, item.parts[0], item.parts[1]]
                 }
             })
@@ -372,7 +396,7 @@ class Amalgamator {
         const homogenize = mvcc.homogenize[direction](this._comparator.stage, riffles)
         const designate = mvcc.designate[direction](this._comparator.primary, homogenize, versions)
         const dilute = mvcc.dilute(designate, item => {
-            return item.parts[0].header.method == 'remove' ? -1 : 0
+            return item.parts[0].method == 'remove' ? -1 : 0
         })
         const iterator = {
             [Symbol.asyncIterator]: function () {
@@ -426,7 +450,7 @@ class Amalgamator {
         await mvcc.splice(item => {
             return {
                 key: item.key.value,
-                parts: item.parts[0].header.method == 'insert' ? item.parts.slice(1) : null
+                parts: item.parts[0].method == 'insert' ? item.parts.slice(1) : null
             }
         }, this.strata, designate)
         stage.amalgamated = true
@@ -445,9 +469,9 @@ class Amalgamator {
         }
     }
 
-    async merge (version, operations, meta) {
+    async merge (version, operations) {
         const mutator = this.mutator(version)
-        await mutator.merge(operations, meta)
+        await mutator.merge(operations, { count: operations.length })
         mutator.commit()
     }
 
@@ -486,16 +510,16 @@ class Mutator {
         this._stage.references[0]++
     }
 
-    async merge (operations, meta) {
+    async merge (operations, extra = {}) {
         const {
-            _amalgamator: { _transformer: transformer, _header: { compose } },
+            _amalgamator: { _transformer: transformer },
             _stage: stage,
             _version: version
         } = this, writes = {}
         let cursor = Strata.nullCursor(), found, index = 0, i = 0
-        for (const operation of operations) {
-            const { method, key, value } = transformer(operation)
-            const compound = { value: key, version, index: i }
+        for (let i = 0, I = operations.length; i < I; i++) {
+            const { method, key, parts, index: _index } = transformer(operations[i], i)
+            const compound = { value: key, version, index: _index }
             for (;;) {
                 ; ({ index, found } = cursor.indexOf(compound, cursor.page.ghosts))
                 if (index != null) {
@@ -504,14 +528,19 @@ class Mutator {
                 cursor.release()
                 cursor = await stage.strata.search(compound)
             }
-            const header = compose(version, method, i, meta)
+            const header = {
+                version: version,
+                method: method,
+                index: _index,
+                ...extra
+            }
             if (method == 'insert') {
-                cursor.insert(index, compound, [ header, key, value ], writes)
+                cursor.insert(index, compound, [ header ].concat(parts), writes)
             } else {
+                assert.equal(method, 'remove')
                 cursor.insert(index, compound, [ header, key ], writes)
             }
             stage.count++
-            i++
         }
         cursor.release()
         await Strata.flush(writes)

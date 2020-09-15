@@ -1,4 +1,4 @@
-require('proof')(2, async okay => {
+require('proof')(3, async okay => {
     const path = require('path')
     const fs = require('fs').promises
 
@@ -20,42 +20,27 @@ require('proof')(2, async okay => {
         errorIfExists: false,
         key: {
             compare: Buffer.compare,
-            serialize: function (key) {
-                return [ key ]
-            },
-            deserialize: function (parts) {
-                return parts[0]
-            }
-        },
-        header: {
-            compose: function (version, method, index, count) {
-                return { header: { method, index }, count, version }
-            },
-            serialize: function (header) {
-                return Buffer.from(JSON.stringify({
-                    header: {
-                        method: header.header.method,
-                        index: header.header.index
-                    },
-                    count: header.count,
-                    version: header.version.toString()
-                }))
-            },
-            deserialize: function (buffer) {
-                const header = JSON.parse(buffer.toString())
-                header.version = BigInt(header.version)
-                return header
-            }
+            extract: function (parts) { return parts[0] },
+            serialize: function (key) { return [ key ] },
+            deserialize: function (parts) { return parts[0] }
         },
         parts: {
             serialize: function (parts) { return parts },
             deserialize: function (parts) { return parts }
         },
-        transformer: function (operation) {
+        transformer: function (operation, index) {
+            if (operation.type == 'put') {
+                return {
+                    method: 'insert',
+                    index: index,
+                    key: operation.key,
+                    parts: [ operation.key, operation.value ]
+                }
+            }
             return {
-                method: operation.type == 'put' ? 'insert' : 'remove',
-                key: operation.key,
-                value: ('value' in operation) ? operation.value : null
+                method: 'remove',
+                index: index,
+                key: operation.key
             }
         },
         primary: {
@@ -75,7 +60,7 @@ require('proof')(2, async okay => {
         const iterator = amalgamator.iterator({ 0: true }, 'forward', null, true)[Symbol.asyncIterator]()
         okay(await iterator.next(), { done: true, value: null }, 'empty')
 
-        await amalgamator.merge(1n, [{
+        await amalgamator.merge(1, [{
             type: 'put',
             key: Buffer.from('a'),
             value: Buffer.from('A')
@@ -93,22 +78,49 @@ require('proof')(2, async okay => {
         }], 4)
 
         const gather = []
-        for await (const items of amalgamator.iterator({ 0: true, 1: true }, 'forward', null, true)) {
+        const versions = { 0: true, 1: true }
+        for await (const items of amalgamator.iterator(versions, 'forward', null, true)) {
             for (const item of items) {
                 gather.push(item.parts[1].toString(), item.parts[2].toString())
             }
         }
         okay(gather, [ 'a', 'A', 'c', 'C' ], 'forward iterator')
 
-        const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('').map(letter => Buffer.from(letter))
+        const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('')
 
-        const put = alphabet.map(letter => { return { type: 'put', key: letter, value: letter } })
-        const del = alphabet.map(letter => { return { type: 'del', key: letter } })
+        const put = alphabet.map(letter => {
+            return {
+                type: 'put', key: Buffer.from(letter), value: Buffer.from(letter.toUpperCase())
+            }
+        })
+        const del = alphabet.map(letter => {
+            return { type: 'del', key: Buffer.from(letter) }
+        })
 
         for (let i = 0; i < 128; i++) {
-            const batch = put.concat(del)
-            await amalgamator.merge(BigInt(i) + 1n, batch, batch.length)
+            const version = i + 1
+            const batch = i == 127 ? put.concat(del.slice(0, 13)) : put.concat(del)
+            await amalgamator.merge(version, batch, batch.length)
+            versions[version] = true
         }
+
+        gather.length = 0
+
+        for await (const items of amalgamator.iterator(versions, 'forward', null, true)) {
+            for (const item of items) {
+                gather.push(item.parts[1].toString(), item.parts[2].toString())
+            }
+        }
+        okay(gather, [
+            'n', 'N', 'o', 'O', 'p', 'P',
+            'q', 'Q', 'r', 'R', 's', 'S',
+            't', 'T', 'u', 'U', 'v', 'V',
+            'w', 'W', 'x', 'X', 'y', 'Y',
+            'z', 'Z'
+        ], 'amalgamate many')
+
+
+        // TODO Reverse iterator.
     })
 
     await destructible.destroy().rejected
