@@ -360,36 +360,53 @@ class Amalgamator {
         }
     }
 
-    async applicable (versions) {
-        for (const stage of this._stages) {
-            for await (const items of mvcc.riffle.forward(stage.strata, Strata.MIN)) {
-                for (const item of items) {
-                    const { version, count } = item.parts[0]
-                    if (versions[version]) {
-                        stage.versions[version] = true
-                    }
-                }
-            }
+    // Seems like we'll be amalgamating at startup each time, for now. Shoudln't
+    // we though? To ensure that we tidy after a hard shutdown? The optimization
+    // of picking up and going with existing stages is nice-to-have, but in
+    // order to know that we're picking up with a good database, no losses, we
+    // need to do cleanup first, or spend more time thinking about how to leave
+    // evidence that the shutdown was soft.
+    //
+    // Besides, amalgamation isn't supposed to be so painful. It goes into
+    // Strata as appends only and then Strata balances in the background.
+
+    //
+    async amalgamate (versions) {
+        // Assert that we're preforming this hard amalgamate with no outstanding
+        // references what-so-ever. Essentially, only at opening.
+        Amalgamator.Error.assert(this._stages.every(stage => {
+            return stage.references.reduce((sum, value) => sum + value, 0) == 0
+        }), 'referenced')
+        for (const stage of this._stages.reverse()) {
+            await this._amalgamate(versions)
         }
+        while (this._stages.length != 0) {
+            await this._unstage()
+        }
+        await this._createNewStage()
     }
 
     async counted (versions = {}) {
         const counts = {}
+        let max = 0
         for (const stage of this._stages) {
+            let _count = 0
             for await (const items of mvcc.riffle.forward(stage.strata, Strata.MIN)) {
                 for (const item of items) {
+                    _count++
                     const { version, count } = item.parts[0]
                     if (counts[version] == null) {
                         counts[version] = count
                     }
                     if (--counts[version] == 0) {
                         versions[version] = true
-                        stage.versions[version] = true
+                        max = Math.max(version, max)
                     }
                 }
             }
+            stage.count = _count
         }
-        return versions
+        return { max, versions }
     }
 
     iterator (versions, direction, key, inclusive, additional = []) {
@@ -462,19 +479,21 @@ class Amalgamator {
         await stage.strata.destructible.destroy().destructed
         // TODO Implement Strata.options.directory.
         await fs.rmdir(stage.path, { recursive: true })
-        this._maybeUnstage()
     }
 
     _maybeUnstage () {
         if (this._open && this._stages.length > 1) {
             const stage = this._stages[this._stages.length - 1]
             if (stage.amalgamated && stage.references.reduce((sum, value) => sum + value, 0) == 0) {
-                this._destructible.unstage.ephemeral([ 'unstage', stage.path ], this._unstage())
+                this._destructible.unstage.ephemeral([ 'unstage', stage.path ], async () => {
+                    await this._unstage()
+                    this._maybeUnstage()
+                })
             }
         }
     }
 
-    async _amalgamate () {
+    async _amalgamate (versions) {
         const stage = this._stages[this._stages.length - 1]
         assert.equal(stage.references.reduce((sum, value) => sum + value), 0)
         const riffle = mvcc.riffle.forward(stage.strata, Strata.MIN)[Symbol.asyncIterator]()
@@ -486,7 +505,7 @@ class Amalgamator {
                 return next
             }
         }
-        const designate = mvcc.designate.forward(this._comparator.primary, working, stage.versions)
+        const designate = mvcc.designate.forward(this._comparator.primary, working, versions)
         await mvcc.splice(item => {
             return {
                 key: item.key.value,
@@ -502,7 +521,7 @@ class Amalgamator {
             const stage = this._stages[this._stages.length - 1]
             if (!stage.amalgamated && stage.references[0] == 0) {
                 this._destructible.amalgamate.ephemeral('amalgamate', async () => {
-                    await this._amalgamate()
+                    await this._amalgamate(stage.versions)
                     this._maybeAmalgamate()
                 })
             }
@@ -519,6 +538,27 @@ class Amalgamator {
         return new Mutator(this, version)
     }
 
+    async _createNewStage () {
+        const directory = path.join(this.directory, 'staging', this._filestamp())
+        await fs.mkdir(directory, { recursive: true })
+        const next = this._newStage(directory, {})
+        await next.strata.create()
+        this._stages.unshift(next)
+    }
+
+    get status () {
+        const status = []
+        for (const stage of this._stages) {
+            status.push({
+                count: stage.count,
+                amalgamated: stage.amalgamated,
+                references: stage.references.slice(),
+                versions: JSON.parse(JSON.stringify(stage.versions))
+            })
+        }
+        return status
+    }
+
     _maybeNewStage () {
         // A race to create the next stage, but the loser will merely create a stage
         // taht will be unused or little used.
@@ -529,11 +569,7 @@ class Amalgamator {
         ) {
             this._rotating = true
             this._destructible.amalgamate.ephemeral('rotate', async () => {
-                const directory = path.join(this.directory, 'staging', this._filestamp())
-                await fs.mkdir(directory, { recursive: true })
-                const next = this._newStage(directory, {})
-                await next.strata.create()
-                this._stages.unshift(next)
+                await this._createNewStage()
                 this._rotating = false
             })
         }

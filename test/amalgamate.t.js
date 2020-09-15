@@ -139,15 +139,22 @@ require('proof')(4, async okay => {
 
             const gather = []
 
-            const versions = { 0: true, ...(await amalgamator.counted()) }
+            const versions = { 0: true }
 
-            await amalgamator.applicable({ 128: true })
+            const max = await amalgamator.counted(versions)
+
+            console.log(amalgamator.status)
+
+            await amalgamator.amalgamate(versions)
+
+            console.log(amalgamator.status)
 
             for await (const items of amalgamator.iterator(versions, 'forward', null, true)) {
                 for (const item of items) {
                     gather.push(item.parts[1].toString(), item.parts[2].toString())
                 }
             }
+
             okay(gather, [
                 'n', 'N', 'o', 'O', 'p', 'P',
                 'q', 'Q', 'r', 'R', 's', 'S',
