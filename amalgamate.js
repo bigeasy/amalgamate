@@ -103,6 +103,7 @@ class Amalgamator {
         // TODO Need to sort out how we manage destruction, since where we're
         // able to open and close, and we have an open and close method. Do we
         // want to use destructible constructs?
+        this.destructible = destructible
         this._destructible = {
             amalgamate: destructible.durable('amalgamate'),
             unstage: destructible.durable('amalgamate'),
@@ -122,7 +123,7 @@ class Amalgamator {
         // True when opening has completed.
         this.ready = new Promise(resolve => this._ready = resolve)
         // Extract a key from the record.
-        this.extractor = options.key.extractor
+        this.extractor = options.key.extract
         // Number of records in a staging tree after which the tree is merged
         // into the primary tree.
         const stage = coalesce(options.stage, {})
@@ -253,17 +254,24 @@ class Amalgamator {
                     deserialize: (parts) => {
                         const header = JSON.parse(parts[0].toString())
                         if (header.method == 'insert') {
-                            return [ header, this._parts.deserialize(parts.slice(1)) ]
+                            return [ header ].concat(this._parts.deserialize(parts.slice(1)))
                         }
                         return [ header ].concat(this._key.deserialize(parts.slice(1)))
                     }
                 }
             },
-            extractor: function (parts) {
+            extractor: (parts) => {
+                if (parts[0].method == 'insert') {
+                    return {
+                        value: this.extractor(parts.slice(1)),
+                        version: parts[0].version,
+                        index: parts[0].index
+                    }
+                }
                 return {
-                    value: this.extractor(parts.slice(1)),
+                    value: parts[1],
                     version: parts[0].version,
-                    index: parts[0].header.index
+                    index: parts[0].index
                 }
             },
             comparator: this._comparator.stage
@@ -350,6 +358,38 @@ class Amalgamator {
         } finally {
             this._ready.call()
         }
+    }
+
+    async applicable (versions) {
+        for (const stage of this._stages) {
+            for await (const items of mvcc.riffle.forward(stage.strata, Strata.MIN)) {
+                for (const item of items) {
+                    const { version, count } = item.parts[0]
+                    if (versions[version]) {
+                        stage.versions[version] = true
+                    }
+                }
+            }
+        }
+    }
+
+    async counted (versions = {}) {
+        const counts = {}
+        for (const stage of this._stages) {
+            for await (const items of mvcc.riffle.forward(stage.strata, Strata.MIN)) {
+                for (const item of items) {
+                    const { version, count } = item.parts[0]
+                    if (counts[version] == null) {
+                        counts[version] = count
+                    }
+                    if (--counts[version] == 0) {
+                        versions[version] = true
+                        stage.versions[version] = true
+                    }
+                }
+            }
+        }
+        return versions
     }
 
     iterator (versions, direction, key, inclusive, additional = []) {
