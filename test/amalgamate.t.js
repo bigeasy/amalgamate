@@ -1,4 +1,4 @@
-require('proof')(4, async okay => {
+require('proof')(8, async okay => {
     const path = require('path')
     const fs = require('fs').promises
 
@@ -11,8 +11,19 @@ require('proof')(4, async okay => {
 
     await fs.rmdir(directory, { recursive: true })
 
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('')
+
+    const put = alphabet.map(letter => {
+        return {
+            type: 'put', key: Buffer.from(letter), value: Buffer.from(letter.toUpperCase())
+        }
+    })
+    const del = alphabet.map(letter => {
+        return { type: 'del', key: Buffer.from(letter) }
+    })
+
     function createAmalgamator () {
-        const destructible = new Destructible(1000, 'amalgamate.t')
+        const destructible = new Destructible(10000, 'amalgamate.t')
         return new Amalgamator(destructible, {
             directory: directory,
             cache: new Cache,
@@ -49,7 +60,7 @@ require('proof')(4, async okay => {
                 branch: { split: 64, merge: 32 },
             },
             stage: {
-                max: 128 * 8,
+                max: 128,
                 leaf: { split: 64, merge: 32 },
                 branch: { split: 64, merge: 32 },
             }
@@ -91,21 +102,10 @@ require('proof')(4, async okay => {
             }
             okay(gather, [ 'a', 'A', 'c', 'C' ], 'forward iterator')
 
-            const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('')
-
-            const put = alphabet.map(letter => {
-                return {
-                    type: 'put', key: Buffer.from(letter), value: Buffer.from(letter.toUpperCase())
-                }
-            })
-            const del = alphabet.map(letter => {
-                return { type: 'del', key: Buffer.from(letter) }
-            })
-
             for (let i = 0; i < 128; i++) {
                 const version = i + 1
                 const batch = i == 127 ? put.concat(del.slice(0, 13)) : put.concat(del)
-                await amalgamator.merge(version, batch, batch.length)
+                await amalgamator.merge(version, batch)
                 versions[version] = true
             }
 
@@ -141,13 +141,9 @@ require('proof')(4, async okay => {
 
             const versions = { 0: true }
 
-            const max = await amalgamator.counted(versions)
-
-            console.log(amalgamator.status)
+            await amalgamator.counted(versions)
 
             await amalgamator.amalgamate(versions)
-
-            console.log(amalgamator.status)
 
             for await (const items of amalgamator.iterator(versions, 'forward', null, true)) {
                 for (const item of items) {
@@ -163,6 +159,68 @@ require('proof')(4, async okay => {
                 'z', 'Z'
             ], 'amalgamate many reopen')
         })
+
+        await amalgamator.destructible.destroy().rejected
+    }
+
+    {
+        await fs.rmdir(directory, { recursive: true })
+
+        const amalgamator = createAmalgamator()
+
+        await amalgamator.ready
+
+        const versions = { 0: true }
+
+        const iterator = amalgamator.iterator(versions, 'forward', null, true)
+
+        {
+            const version = 1
+            const versions = { 0: true }
+            versions[version] = true
+            const batch = put.concat(del).concat(put).concat(del).concat(put)
+            const mutator = amalgamator.mutator(versions, version)
+            await mutator.merge(batch)
+            okay(!mutator.conflicted, 'not conflicted')
+            mutator.commit()
+        }
+
+        {
+            await new Promise(resolve => setTimeout(resolve, 250))
+            const version = 2
+            const versions = { 0: true }
+            versions[version] = true
+            const batch = put.concat(del).concat(put).concat(del).concat(put)
+            const mutator = amalgamator.mutator(versions, version)
+            await mutator.merge(batch)
+            okay(mutator.conflicted, 'conflicted next stage')
+            mutator.commit()
+        }
+
+        iterator['return']()
+
+        {
+            await amalgamator.drain()
+            console.log(require('util').inspect(amalgamator.status, { depth: null }))
+            const status = amalgamator.status
+            const version = 3
+            const versions = { 0: true, 2: true, 1: true }
+            versions[version] = true
+            const mutator = amalgamator.mutator(versions, version)
+            await mutator.merge(put)
+            okay(!mutator.conflicted, 'not conflicted')
+            mutator.commit()
+        }
+
+        {
+            const version = 4
+            const versions = { 0: true }
+            versions[version] = true
+            const mutator = amalgamator.mutator(versions, version)
+            await mutator.merge(put)
+            okay(mutator.conflicted, 'conflicted within stage')
+            mutator.commit()
+        }
 
         await amalgamator.destructible.destroy().rejected
     }
