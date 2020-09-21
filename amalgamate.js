@@ -329,15 +329,13 @@ class Amalgamator {
                 }
             }) ()
             const subdirs = [ 'primary', 'staging' ]
-            if (exists) {
-                const sorted = files.filter(file => file[0] != '.').sort()
-                if (!sorted.length) {
-                    exists = false
-                // TODO Not a very clever recover, something might be in the midst
-                // of a rotation.
-                } else if (!subdirs.every(file => sorted.shift() == file) || sorted.length) {
-                    throw new Amalgamator.Error('not a Locket datastore')
-                }
+            const sorted = files.filter(file => file[0] != '.').sort()
+            if (!sorted.length) {
+                exists = false
+            // TODO Not a very clever recover, something might be in the midst
+            // of a rotation.
+            } else if (!subdirs.every(file => sorted.shift() == file) || sorted.length) {
+                throw new Amalgamator.Error('not a Locket datastore')
             }
             if (exists && errorIfExists) {
                 throw new Amalgamator.Error('database already exists')
