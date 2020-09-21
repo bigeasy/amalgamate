@@ -1,4 +1,4 @@
-require('proof')(14, async okay => {
+require('proof')(16, async okay => {
     const path = require('path')
     const fs = require('fs').promises
 
@@ -124,12 +124,28 @@ require('proof')(14, async okay => {
             okay(gather, [ 'a', 'A', 'c', 'C' ], 'forward iterator')
 
             gather.length = 0
+            for await (const items of amalgamator.iterator(versions, 'forward', Buffer.from('a'), false)) {
+                for (const item of items) {
+                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+                }
+            }
+            okay(gather, [ 'c', 'C' ], 'forward iterator not inclusive')
+
+            gather.length = 0
             for await (const items of amalgamator.iterator(versions, 'reverse', null, true)) {
                 for (const item of items) {
                     gather.push(item.parts[1].toString(), item.parts[2].toString())
                 }
             }
             okay(gather, [ 'c', 'C', 'a', 'A' ], 'reverse iterator')
+
+            gather.length = 0
+            for await (const items of amalgamator.iterator(versions, 'reverse', Buffer.from('c'), false)) {
+                for (const item of items) {
+                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+                }
+            }
+            okay(gather, [ 'a', 'A' ], 'reverse iterator not inclusive')
 
             for (let i = 0; i < 128; i++) {
                 const version = i + 1

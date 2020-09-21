@@ -443,7 +443,7 @@ class Amalgamator {
                 : Strata.MAX
         const compound = typeof versioned == 'symbol' ? versioned : versioned.value
 
-        const riffle = mvcc.riffle[direction](this.strata, compound, 32, inclusive)
+        const riffle = mvcc.riffle[direction](this.strata, compound, { slice: 32, inclusive })
         const primary = mvcc.twiddle(riffle, items => {
             // TODO Looks like I'm in the habit of adding extra stuff, meta stuff,
             // so the records, so go back and ensure that I'm allowing this,
