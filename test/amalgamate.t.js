@@ -1,9 +1,11 @@
-require('proof')(10, async okay => {
+require('proof')(13, async okay => {
     const path = require('path')
     const fs = require('fs').promises
 
     const Destructible = require('destructible')
     const Amalgamator = require('..')
+
+    const rescue = require('rescue')
 
     const Cache = require('b-tree/cache')
 
@@ -22,7 +24,7 @@ require('proof')(10, async okay => {
         return { type: 'del', key: Buffer.from(letter) }
     })
 
-    function createAmalgamator () {
+    function createAmalgamator (options) {
         const destructible = new Destructible(10000, 'amalgamate.t')
         return new Amalgamator(destructible, {
             directory: directory,
@@ -63,8 +65,27 @@ require('proof')(10, async okay => {
                 max: 128,
                 leaf: { split: 64, merge: 32 },
                 branch: { split: 64, merge: 32 },
-            }
+            },
+            ...options
         })
+    }
+
+    {
+        try {
+            await createAmalgamator({ directory: __dirname }).destructible.rejected
+        } catch (error) {
+            rescue(error, [ Amalgamator.Error, /not a Locket/ ])
+            okay('not an appropriate directory')
+        }
+    }
+
+    {
+        try {
+            await createAmalgamator({ createIfMissing: false }).destructible.rejected
+        } catch (error) {
+            rescue(error, [ Amalgamator.Error, /does not exist/ ])
+            okay('does not exist')
+        }
     }
 
     {
@@ -129,6 +150,15 @@ require('proof')(10, async okay => {
         })
 
         await amalgamator.destructible.destroy().rejected
+    }
+
+    {
+        try {
+            await createAmalgamator({ errorIfExists: true }).destructible.rejected
+        } catch (error) {
+            rescue(error, [ Amalgamator.Error, /already exists/ ])
+            okay('error if exists')
+        }
     }
 
     {
