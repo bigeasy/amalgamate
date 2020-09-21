@@ -1,4 +1,4 @@
-require('proof')(8, async okay => {
+require('proof')(10, async okay => {
     const path = require('path')
     const fs = require('fs').promises
 
@@ -217,9 +217,41 @@ require('proof')(8, async okay => {
             const versions = { 0: true }
             versions[version] = true
             const mutator = amalgamator.mutator(versions, version)
-            await mutator.merge(put)
+            await mutator.merge(del)
             okay(mutator.conflicted, 'conflicted within stage')
             mutator.commit()
+        }
+
+        {
+            await amalgamator.amalgamate({ 0: true, 3: true, 4: true })
+            console.log(require('util').inspect(amalgamator.status, { depth: null }))
+            const version = 5
+            const versions = { 0: true, 5: true }
+            const mutator = amalgamator.mutator(versions, version)
+            await mutator.merge(put.concat(put).concat(put).concat(put).concat(put))
+            okay(!mutator.conflicted, 'not conflicted before rollback')
+            mutator.rollback()
+            await amalgamator.drain()
+            console.log(require('util').inspect(amalgamator.status, { depth: null }))
+            const status = amalgamator.status
+
+            const gather = []
+
+            for await (const items of amalgamator.iterator({ 0: true }, 'forward', null, true)) {
+                for (const item of items) {
+                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+                }
+            }
+
+            okay({
+                gather: gather,
+                length: status.stages.length,
+                count: status.stages[0].count
+            }, {
+                gather: [],
+                length: 1,
+                count: 0
+            }, 'amalgamate many reopen')
         }
 
         await amalgamator.destructible.destroy().rejected
