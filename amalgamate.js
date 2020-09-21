@@ -473,7 +473,6 @@ class Amalgamator {
             [Symbol.asyncIterator]: function () {
                 return this
             },
-            riffles: 0,
             next: async function () {
                 const next = await dilute.next()
                 if (next.done) {

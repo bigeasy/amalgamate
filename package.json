@@ -29,7 +29,7 @@
                             "homogenize":                   "2.0.0-alpha.4",
                             "interrupt":                    "^10.1.0",
                             "rescue":                       "7.0.0-alpha.1",
-                            "riffle":                       "2.0.0-alpha.18",
+                            "riffle":                       "2.0.0-alpha.19",
                             "splice":                       "3.0.0-alpha.11",
                             "twiddle":                      "2.0.0-alpha.4"
     },
