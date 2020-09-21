@@ -116,12 +116,22 @@ require('proof')(13, async okay => {
 
             const gather = []
             const versions = { 0: true, 1: true }
-            for await (const items of amalgamator.iterator(versions, 'forward', null, true)) {
+            for await (const items of amalgamator.iterator(versions, 'forward', Buffer.from('a'), true)) {
                 for (const item of items) {
                     gather.push(item.parts[1].toString(), item.parts[2].toString())
                 }
             }
             okay(gather, [ 'a', 'A', 'c', 'C' ], 'forward iterator')
+
+/*
+            gather.length = 0
+            for await (const items of amalgamator.iterator(versions, 'reverse', null, true)) {
+                for (const item of items) {
+                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+                }
+            }
+            okay(gather, [ 'a', 'A', 'c', 'C' ], 'reverse iterator')
+*/
 
             for (let i = 0; i < 128; i++) {
                 const version = i + 1
