@@ -465,7 +465,8 @@ class Amalgamator {
             })
         }).concat(primary).concat(additional)
         const homogenize = mvcc.homogenize[direction](this._comparator.stage, riffles)
-        const designate = mvcc.designate[direction](this._comparator.primary, homogenize, versions)
+        const visible = mvcc.dilute(homogenize, item => versions[item.key.version] ? 0 : -1)
+        const designate = mvcc.designate[direction](this._comparator.primary, visible)
         const dilute = mvcc.dilute(designate, item => {
             return item.parts[0].method == 'remove' ? -1 : 0
         })
@@ -525,7 +526,8 @@ class Amalgamator {
                 return next
             }
         }
-        const designate = mvcc.designate.forward(this._comparator.primary, working, versions)
+        const visible = mvcc.dilute(working, item => versions[item.key.version] ? 0 : -1)
+        const designate = mvcc.designate.forward(this._comparator.primary, visible)
         await mvcc.splice(item => {
             return {
                 key: item.key.value,

@@ -22,15 +22,15 @@
     },
     "dependencies":
     {
-                            "b-tree":                       "2.0.0-alpha.36",
-                            "designate":                    "2.0.0-alpha.3",
+                            "b-tree":                       "2.0.0-alpha.39",
+                            "designate":                    "2.0.0-alpha.4",
                             "dilute":                       "2.0.0-alpha.3",
                             "extant":                       "^1.0.20",
                             "homogenize":                   "2.0.0-alpha.4",
                             "interrupt":                    "^10.1.0",
                             "rescue":                       "7.0.0-alpha.1",
-                            "riffle":                       "2.0.0-alpha.21",
-                            "splice":                       "3.0.0-alpha.11",
+                            "riffle":                       "2.0.0-alpha.24",
+                            "splice":                       "3.0.0-alpha.13",
                             "twiddle":                      "2.0.0-alpha.4"
     },
     "devDependencies":
