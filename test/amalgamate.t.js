@@ -1,9 +1,16 @@
-require('proof')(16, async okay => {
+require('proof')(10, async okay => {
+    function dump (object) {
+        console.log(require('util').inspect(object, { depth: null }))
+    }
+
+    const assert = require('assert')
+
     const path = require('path')
     const fs = require('fs').promises
 
     const Destructible = require('destructible')
     const Amalgamator = require('..')
+    const Locker = require('../locker')
 
     const rescue = require('rescue')
 
@@ -28,6 +35,7 @@ require('proof')(16, async okay => {
         const destructible = new Destructible(10000, 'amalgamate.t')
         return new Amalgamator(destructible, {
             directory: directory,
+            locker: new Locker({ heft: 1024 }),
             cache: new Cache,
             comparator: Buffer.compare,
             createIfMissing: true,
@@ -42,18 +50,18 @@ require('proof')(16, async okay => {
                 serialize: function (parts) { return parts },
                 deserialize: function (parts) { return parts }
             },
-            transformer: function (operation, index) {
+            transformer: function (operation, order) {
                 if (operation.type == 'put') {
                     return {
                         method: 'insert',
-                        index: index,
+                        order: order,
                         key: operation.key,
                         parts: [ operation.key, operation.value ]
                     }
                 }
                 return {
                     method: 'remove',
-                    index: index,
+                    order: order,
                     key: operation.key
                 }
             },
@@ -62,9 +70,8 @@ require('proof')(16, async okay => {
                 branch: { split: 64, merge: 32 },
             },
             stage: {
-                max: 128,
-                leaf: { split: 64, merge: 32 },
-                branch: { split: 64, merge: 32 },
+                leaf: { split: 256, merge: 32 },
+                branch: { split: 256, merge: 32 },
             },
             ...options
         })
@@ -94,10 +101,16 @@ require('proof')(16, async okay => {
         await amalgamator.ready
 
         await Destructible.rescue(async function () {
-            const iterator = amalgamator.iterator({ 0: true }, 'forward', null, true)[Symbol.asyncIterator]()
+            const snapshots = [ amalgamator.locker.snapshot() ]
+            const iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)[Symbol.asyncIterator]()
+
             okay(await iterator.next(), { done: true, value: null }, 'empty')
 
-            await amalgamator.merge(1, [{
+            amalgamator.locker.release(snapshots.shift())
+
+            const mutator = amalgamator.locker.mutator()
+
+            await amalgamator.merge(mutator, [{
                 type: 'put',
                 key: Buffer.from('a'),
                 value: Buffer.from('A')
@@ -112,11 +125,16 @@ require('proof')(16, async okay => {
             }, {
                 type: 'del',
                 key: Buffer.from('b')
-            }], 4)
+            }], true)
+
+            okay(mutator.conflicted, false, 'no conflicts')
+
+            amalgamator.locker.commit(mutator)
+
+            snapshots.push(amalgamator.locker.snapshot())
 
             const gather = []
-            const versions = { 0: true, 1: true }
-            for await (const items of amalgamator.iterator(versions, 'forward', Buffer.from('a'), true)) {
+            for await (const items of amalgamator.iterator(snapshots[0], 'forward', Buffer.from('a'), true)) {
                 for (const item of items) {
                     gather.push(item.parts[1].toString(), item.parts[2].toString())
                 }
@@ -124,7 +142,7 @@ require('proof')(16, async okay => {
             okay(gather, [ 'a', 'A', 'c', 'C' ], 'forward iterator')
 
             gather.length = 0
-            for await (const items of amalgamator.iterator(versions, 'forward', Buffer.from('a'), false)) {
+            for await (const items of amalgamator.iterator(snapshots[0], 'forward', Buffer.from('a'), false)) {
                 for (const item of items) {
                     gather.push(item.parts[1].toString(), item.parts[2].toString())
                 }
@@ -132,7 +150,7 @@ require('proof')(16, async okay => {
             okay(gather, [ 'c', 'C' ], 'forward iterator not inclusive')
 
             gather.length = 0
-            for await (const items of amalgamator.iterator(versions, 'reverse', null, true)) {
+            for await (const items of amalgamator.iterator(snapshots[0], 'reverse', null, true)) {
                 for (const item of items) {
                     gather.push(item.parts[1].toString(), item.parts[2].toString())
                 }
@@ -140,23 +158,35 @@ require('proof')(16, async okay => {
             okay(gather, [ 'c', 'C', 'a', 'A' ], 'reverse iterator')
 
             gather.length = 0
-            for await (const items of amalgamator.iterator(versions, 'reverse', Buffer.from('c'), false)) {
+            for await (const items of amalgamator.iterator(snapshots[0], 'reverse', Buffer.from('c'), false)) {
                 for (const item of items) {
                     gather.push(item.parts[1].toString(), item.parts[2].toString())
                 }
             }
             okay(gather, [ 'a', 'A' ], 'reverse iterator not inclusive')
 
+            amalgamator.locker.release(snapshots.shift())
+
             for (let i = 0; i < 128; i++) {
+                const mutator = amalgamator.locker.mutator()
                 const version = i + 1
                 const batch = i == 127 ? put.concat(del.slice(0, 13)) : put.concat(del)
-                await amalgamator.merge(version, batch)
-                versions[version] = true
+                await amalgamator.merge(mutator, batch, true)
+                assert(!mutator.conflicted)
+                amalgamator.locker.commit(mutator)
             }
+
+            //dump(amalgamator.locker.status)
+
+            await new Promise(resolve => setTimeout(resolve, 2500))
+
+            //dump(amalgamator.locker.status)
+
+            snapshots.push(amalgamator.locker.snapshot())
 
             gather.length = 0
 
-            for await (const items of amalgamator.iterator(versions, 'forward', null, true)) {
+            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
                 for (const item of items) {
                     gather.push(item.parts[1].toString(), item.parts[2].toString())
                 }
@@ -168,7 +198,6 @@ require('proof')(16, async okay => {
                 'w', 'W', 'x', 'X', 'y', 'Y',
                 'z', 'Z'
             ], 'amalgamate many')
-
 
             // TODO Reverse iterator.
         })
@@ -185,6 +214,8 @@ require('proof')(16, async okay => {
         }
     }
 
+    return
+
     {
         const amalgamator = createAmalgamator()
 
@@ -195,9 +226,9 @@ require('proof')(16, async okay => {
 
             const versions = { 0: true }
 
-            await amalgamator.counted(versions)
+            await amalgamator.count()
 
-            await amalgamator.amalgamate(versions)
+            amalgamator.locker
 
             for await (const items of amalgamator.iterator(versions, 'forward', null, true)) {
                 for (const item of items) {
@@ -216,6 +247,8 @@ require('proof')(16, async okay => {
 
         await amalgamator.destructible.destroy().rejected
     }
+
+    return
 
     {
         await fs.rmdir(directory, { recursive: true })

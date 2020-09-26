@@ -1,4 +1,6 @@
-require('proof')(11, okay => {
+require('proof')(11, async okay => {
+    const once = require('prospective/once')
+
     class Amalgamator {
         constructor (locker) {
             this.stages = [{
@@ -17,7 +19,7 @@ require('proof')(11, okay => {
         }
 
         unstage () {
-            this.locker.unstage(this)
+            this.locker.unstaged(this)
         }
     }
 
@@ -38,42 +40,44 @@ require('proof')(11, okay => {
 
     const mutators = [ locker.mutator() ]
 
-    okay(locker.group(1), 0, 'group lookup')
+    okay(locker.group(mutators[0].mutation.version), 1, 'group lookup')
 
     snapshots.push(locker.snapshot())
 
     locker.heft(mutators[0].mutation.version, 16)
 
-    okay(!locker.visible(1, snapshots[0]), 'invisible')
+    okay(!locker.visible(2, snapshots[0]), 'invisible')
 
     mutators.push(locker.mutator())
 
-    okay(locker.conflicted(1, mutators[1]), 'conflicted with prior')
-    okay(locker.conflicted(2, mutators[0]), 'conflicted with subsequent')
+    okay(locker.conflicted(2, mutators[1]), 'conflicted with prior')
+    okay(locker.conflicted(3, mutators[0]), 'conflicted with subsequent')
 
     locker.commit(mutators.shift())
 
     mutators.push(locker.mutator())
 
-    okay(locker.conflicted(1, mutators[0]), 'still conflicted with prior')
-    okay(!locker.conflicted(1, mutators[1]), 'not conflicted with committed')
-    okay(locker.conflicted(2, mutators[1]), 'conflicted with uncommitted')
+    okay(locker.conflicted(2, mutators[0]), 'still conflicted with prior')
+    okay(!locker.conflicted(2, mutators[1]), 'not conflicted with committed')
+    okay(locker.conflicted(3, mutators[1]), 'conflicted with uncommitted')
 
     locker.rollback(mutators.shift())
 
     okay(!locker.conflicted(2, mutators[0]), 'not conflicted with rolledback')
 
-    okay(!locker.visible(1, snapshots[0]), 'still invisible')
+    okay(!locker.visible(2, snapshots[0]), 'still invisible')
 
     snapshots.push(locker.snapshot())
 
-    okay(locker.visible(1, snapshots[1]), 'new snapshot visible')
+    okay(locker.visible(2, snapshots[1]), 'new snapshot visible')
 
     locker.heft(3, 17)
 
     snapshots.push(locker.snapshot())
 
-    dump()
+    //dump()
+
+    const drained = [ locker.drain(), locker.drain() ]
 
     locker.commit(mutators.shift())
     locker.release(snapshots.shift())
@@ -81,11 +85,21 @@ require('proof')(11, okay => {
 
     snapshots.push(locker.snapshot())
 
-    console.log(require('util').inspect(snapshots, { depth: null }))
-
-    dump()
+    //dump()
 
     locker.release(snapshots.shift())
+    locker.release(snapshots.shift())
 
-    dump()
+    drained.push(locker.drain())
+
+    for (const drain of drained) {
+        await drain
+    }
+
+    console.log('explicit rotate')
+    await locker.rotate()
+
+    console.log('done')
+
+    //dump()
 })
