@@ -1,4 +1,4 @@
-require('proof')(11, async okay => {
+require('proof')(15, async okay => {
     const once = require('prospective/once')
 
     class Amalgamator {
@@ -66,6 +66,8 @@ require('proof')(11, async okay => {
     locker.rollback(mutators.shift())
 
     okay(!locker.conflicted(3, mutators[0]), 'not conflicted with rolledback')
+    okay(!locker.conflicted(5, mutators[0]), 'not conflicted with self')
+    okay(locker.visible(5, mutators[0]), 'visible to self')
 
     okay(!locker.visible(3, snapshots[0]), 'still invisible')
 
@@ -77,7 +79,7 @@ require('proof')(11, async okay => {
 
     snapshots.push(locker.snapshot())
 
-    //dump()
+    dump()
 
     const drained = [ locker.drain(), locker.drain() ]
 
@@ -98,10 +100,11 @@ require('proof')(11, async okay => {
         await drain
     }
 
-    console.log('explicit rotate')
+    okay('explicit rotate')
+
     await locker.rotate()
 
-    console.log('done')
+    okay('done')
 
     //dump()
 })
