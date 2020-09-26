@@ -25,13 +25,14 @@ class Locker extends events.EventEmitter {
     }
 
     recover (versions) {
-        assert(this._groups[0].group == 0 && this._groups[0].heft == 0)
+        assert(this._groups[0].group == 1 && this._groups[0].heft == 0)
         for (const version of versions) {
             const mutation = {
                 version, created: 0, completed: 0, rolledback: false
             }
-            this._groups[0].mutations.put(version, mutation)
+            this._groups[0].mutations.set(version, mutation)
             this._groups[0].max = Math.max(this._groups[0].max, version)
+            this._version = this._groups[0].max + 1
         }
     }
 

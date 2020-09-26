@@ -26,6 +26,8 @@ require('proof')(11, async okay => {
     const Locker = require('../locker')
     const locker = new Locker({ heft: 32 })
 
+    locker.recover([ 2 ])
+
     function dump () {
         console.log(require('util').inspect(locker.status, { depth: null }))
     }
@@ -46,32 +48,32 @@ require('proof')(11, async okay => {
 
     locker.heft(mutators[0].mutation.version, 16)
 
-    okay(!locker.visible(2, snapshots[0]), 'invisible')
+    okay(!locker.visible(3, snapshots[0]), 'invisible')
 
     mutators.push(locker.mutator())
 
-    okay(locker.conflicted(2, mutators[1]), 'conflicted with prior')
-    okay(locker.conflicted(3, mutators[0]), 'conflicted with subsequent')
+    okay(locker.conflicted(3, mutators[1]), 'conflicted with prior')
+    okay(locker.conflicted(4, mutators[0]), 'conflicted with subsequent')
 
     locker.commit(mutators.shift())
 
     mutators.push(locker.mutator())
 
-    okay(locker.conflicted(2, mutators[0]), 'still conflicted with prior')
-    okay(!locker.conflicted(2, mutators[1]), 'not conflicted with committed')
-    okay(locker.conflicted(3, mutators[1]), 'conflicted with uncommitted')
+    okay(locker.conflicted(3, mutators[0]), 'still conflicted with prior')
+    okay(!locker.conflicted(3, mutators[1]), 'not conflicted with committed')
+    okay(locker.conflicted(4, mutators[1]), 'conflicted with uncommitted')
 
     locker.rollback(mutators.shift())
 
-    okay(!locker.conflicted(2, mutators[0]), 'not conflicted with rolledback')
+    okay(!locker.conflicted(3, mutators[0]), 'not conflicted with rolledback')
 
-    okay(!locker.visible(2, snapshots[0]), 'still invisible')
+    okay(!locker.visible(3, snapshots[0]), 'still invisible')
 
     snapshots.push(locker.snapshot())
 
-    okay(locker.visible(2, snapshots[1]), 'new snapshot visible')
+    okay(locker.visible(3, snapshots[1]), 'new snapshot visible')
 
-    locker.heft(3, 17)
+    locker.heft(4, 17)
 
     snapshots.push(locker.snapshot())
 
