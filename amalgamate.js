@@ -176,8 +176,8 @@ class Amalgamator {
                 }
             }
         }
-        destructible.destruct(() => {
-            this._open = false
+        destructible.destruct(() => this._open = false)
+        destructible.close(() => {
             destructible.ephemeral('shutdown', async () => {
                 await this._destructible.amalgamate.destroy().destructed
                 this._destructible.strata.decrement()
