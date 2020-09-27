@@ -26,9 +26,9 @@ class Locker extends events.EventEmitter {
 
     recover (versions) {
         assert(this._groups[0].group == 1 && this._groups[0].heft == 0)
-        for (const version of versions) {
+        for (const [ version, committed ] of versions) {
             const mutation = {
-                version, created: 0, completed: 0, rolledback: false
+                version, created: 0, completed: 0, rolledback: ! committed
             }
             this._groups[0].mutations.set(version, mutation)
             this._groups[0].max = Math.max(this._groups[0].max, version)

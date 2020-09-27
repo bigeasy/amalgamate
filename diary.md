@@ -1,3 +1,47 @@
+## Sat Sep 26 20:40:19 CDT 2020
+
+New shutdown problems. Same as before, but now with a new level of indirection.
+When we call destroy on an Amalgamator a Locker may be in the process of
+rotating and then call one of our rotation steps. We'll have no idea if it is
+coming. An application can wait for rotation to drain before destroying, but
+destroying is supposed to come from the user, so it will have to stave off
+destruction of the Amalgamators, wait for the Locker to drain, then it can
+destroy Amalgamators and they can just destroy their Stratas immediately.
+
+But, this sort of timing, is it necessary. The working method could report all
+the time, but we'd need to document it.
+
+`working()` should only be used for operations that will proceded after shutdown
+to finalize an object, the most obvious case is any sort of work queue. The
+queue should no longer allow new work to be submitted, working will fire to
+indicate that progress is being made toward shutdown by doing work in the queue.
+
+And isn't this the case, finish what you where doing is going to be the common
+case for my applications. Maybe at some point there will be an application that
+has a specific shutdown tasks that begins at shutdown, such as saving state by
+writing out a lot of data to disk.
+
+Somehow I see some sort of shutdown dependency tree, like the Locker ->
+Amalgamate -> Strata tree in this application. I also see queues, or boundaries.
+Strata when given work needs to write it and then maybe balance it. If you stop
+giving it work, it will finish writing and balancing. Amalgamate when is asked
+to write to stage or rotate stage. If you stop writing to stage there will be no
+more rotating of stages, but rotating of stages requires giving writes to
+Strata, so there really is no way for the root destroy to tell Strata to
+destroy itself, it has no right.
+
+And what then if there is an error? I suppose with an error we attempt to
+shutdown as many brances of the tree as will shutdown in an orderly fashion.
+
+Is this a reasonable model for shutdown? Every destructible thing is a queue in
+some fashion, it has input and output and either the user is responsible for
+halting input, or else provide a logic for it. It seems like there ought to be
+an operational check at the boundary of Memento that will not allow new mutators
+and snapshots to be created, and that would make it so that Amalgamate doesn't
+have to duplicate this checking in merge, nor does Strata need to perform this
+at `insert` and `remove`, but Destructible still complains about creating a new
+`ephemeral`, that is safety brake.
+
 ## Tue Sep 15 14:44:14 CDT 2020
 
 Starting to consider opportunistic locking, which does not apply to Locket. Who

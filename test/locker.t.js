@@ -26,7 +26,10 @@ require('proof')(15, async okay => {
     const Locker = require('../locker')
     const locker = new Locker({ heft: 32 })
 
-    locker.recover([ 2 ])
+    const recover = new Map
+    recover.set(2, true)
+    recover.set(3, false)
+    locker.recover(recover)
 
     function dump () {
         console.log(require('util').inspect(locker.status, { depth: null }))
@@ -52,30 +55,30 @@ require('proof')(15, async okay => {
 
     mutators.push(locker.mutator())
 
-    okay(locker.conflicted(3, mutators[1]), 'conflicted with prior')
-    okay(locker.conflicted(4, mutators[0]), 'conflicted with subsequent')
+    okay(locker.conflicted(4, mutators[1]), 'conflicted with prior')
+    okay(locker.conflicted(5, mutators[0]), 'conflicted with subsequent')
 
     locker.commit(mutators.shift())
 
     mutators.push(locker.mutator())
 
-    okay(locker.conflicted(3, mutators[0]), 'still conflicted with prior')
-    okay(!locker.conflicted(3, mutators[1]), 'not conflicted with committed')
-    okay(locker.conflicted(4, mutators[1]), 'conflicted with uncommitted')
+    okay(locker.conflicted(4, mutators[0]), 'still conflicted with prior')
+    okay(!locker.conflicted(4, mutators[1]), 'not conflicted with committed')
+    okay(locker.conflicted(5, mutators[1]), 'conflicted with uncommitted')
 
     locker.rollback(mutators.shift())
 
-    okay(!locker.conflicted(3, mutators[0]), 'not conflicted with rolledback')
-    okay(!locker.conflicted(5, mutators[0]), 'not conflicted with self')
-    okay(locker.visible(5, mutators[0]), 'visible to self')
+    okay(!locker.conflicted(4, mutators[0]), 'not conflicted with rolledback')
+    okay(!locker.conflicted(6, mutators[0]), 'not conflicted with self')
+    okay(locker.visible(6, mutators[0]), 'visible to self')
 
-    okay(!locker.visible(3, snapshots[0]), 'still invisible')
+    okay(!locker.visible(4, snapshots[0]), 'still invisible')
 
     snapshots.push(locker.snapshot())
 
-    okay(locker.visible(3, snapshots[1]), 'new snapshot visible')
+    okay(locker.visible(4, snapshots[1]), 'new snapshot visible')
 
-    locker.heft(4, 17)
+    locker.heft(5, 17)
 
     snapshots.push(locker.snapshot())
 

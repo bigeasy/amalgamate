@@ -1,4 +1,4 @@
-require('proof')(10, async okay => {
+require('proof')(23, async okay => {
     function dump (object) {
         console.log(require('util').inspect(object, { depth: null }))
     }
@@ -35,7 +35,7 @@ require('proof')(10, async okay => {
         const destructible = new Destructible(10000, 'amalgamate.t')
         return new Amalgamator(destructible, {
             directory: directory,
-            locker: new Locker({ heft: 1024 }),
+            locker: new Locker({ heft: 1024 * 8 }),
             cache: new Cache,
             comparator: Buffer.compare,
             createIfMissing: true,
@@ -66,8 +66,8 @@ require('proof')(10, async okay => {
                 }
             },
             primary: {
-                leaf: { split: 64, merge: 32 },
-                branch: { split: 64, merge: 32 },
+                leaf: { split: 256, merge: 32 },
+                branch: { split: 256, merge: 32 },
             },
             stage: {
                 leaf: { split: 256, merge: 32 },
@@ -214,23 +214,27 @@ require('proof')(10, async okay => {
         }
     }
 
-    return
-
     {
         const amalgamator = createAmalgamator()
 
         await Destructible.rescue(async function () {
-            await amalgamator.ready
-
             const gather = []
 
-            const versions = { 0: true }
+            await amalgamator.ready
 
             await amalgamator.count()
 
-            amalgamator.locker
+            await amalgamator.locker.rotate()
 
-            for await (const items of amalgamator.iterator(versions, 'forward', null, true)) {
+            okay(amalgamator.status.stages[0].groups, [ 2 ], 'reopen')
+
+            await amalgamator.locker.rotate()
+
+            okay(amalgamator.status.stages[0].groups, [ 3 ], 'no-op rotate')
+
+            const snapshots = [ amalgamator.locker.snapshot() ]
+
+            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
                 for (const item of items) {
                     gather.push(item.parts[1].toString(), item.parts[2].toString())
                 }
@@ -243,103 +247,148 @@ require('proof')(10, async okay => {
                 'w', 'W', 'x', 'X', 'y', 'Y',
                 'z', 'Z'
             ], 'amalgamate many reopen')
-        })
 
-        await amalgamator.destructible.destroy().rejected
-    }
+            const mutator = amalgamator.locker.mutator()
 
-    return
+            okay(mutator.mutation.version, 4, 'clean shutdown')
 
-    {
-        await fs.rmdir(directory, { recursive: true })
+            await amalgamator.merge(mutator, put.concat(del.slice(0, 23)), true)
 
-        const amalgamator = createAmalgamator()
+            amalgamator.locker.commit(mutator)
 
-        await amalgamator.ready
+            amalgamator.locker.release(snapshots.shift())
 
-        const versions = { 0: true }
+            snapshots.push(amalgamator.locker.snapshot())
 
-        const iterator = amalgamator.iterator(versions, 'forward', null, true)
+            gather.length = 0
 
-        {
-            const version = 1
-            const versions = { 0: true }
-            versions[version] = true
-            const batch = put.concat(del).concat(put).concat(del).concat(put)
-            const mutator = amalgamator.mutator(versions, version)
-            await mutator.merge(batch)
-            okay(!mutator.conflicted, 'not conflicted')
-            mutator.commit()
-        }
-
-        {
-            await new Promise(resolve => setTimeout(resolve, 250))
-            const version = 2
-            const versions = { 0: true }
-            versions[version] = true
-            const batch = put.concat(del).concat(put).concat(del).concat(put)
-            const mutator = amalgamator.mutator(versions, version)
-            await mutator.merge(batch)
-            okay(mutator.conflicted, 'conflicted next stage')
-            mutator.commit()
-        }
-
-        iterator['return']()
-
-        {
-            await amalgamator.drain()
-            console.log(require('util').inspect(amalgamator.status, { depth: null }))
-            const status = amalgamator.status
-            const version = 3
-            const versions = { 0: true, 2: true, 1: true }
-            versions[version] = true
-            const mutator = amalgamator.mutator(versions, version)
-            await mutator.merge(put)
-            okay(!mutator.conflicted, 'not conflicted')
-            mutator.commit()
-        }
-
-        {
-            const version = 4
-            const versions = { 0: true }
-            versions[version] = true
-            const mutator = amalgamator.mutator(versions, version)
-            await mutator.merge(del)
-            okay(mutator.conflicted, 'conflicted within stage')
-            mutator.commit()
-        }
-
-        {
-            await amalgamator.amalgamate({ 0: true, 3: true, 4: true })
-            console.log(require('util').inspect(amalgamator.status, { depth: null }))
-            const version = 5
-            const versions = { 0: true, 5: true }
-            const mutator = amalgamator.mutator(versions, version)
-            await mutator.merge(put.concat(put).concat(put).concat(put).concat(put))
-            okay(!mutator.conflicted, 'not conflicted before rollback')
-            mutator.rollback()
-            await amalgamator.drain()
-            console.log(require('util').inspect(amalgamator.status, { depth: null }))
-            const status = amalgamator.status
-
-            const gather = []
-
-            for await (const items of amalgamator.iterator({ 0: true }, 'forward', null, true)) {
+            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
                 for (const item of items) {
                     gather.push(item.parts[1].toString(), item.parts[2].toString())
                 }
             }
 
-            okay({
-                gather: gather,
-                length: status.stages.length,
-                count: status.stages[0].count
-            }, {
-                gather: [],
-                length: 1,
-                count: 0
-            }, 'amalgamate many reopen')
-        }
+            okay(gather, [ 'x', 'X', 'y', 'Y', 'z', 'Z' ], 'staged')
+
+            console.log(require('util').inspect(amalgamator.status, { depth: null }))
+        })
+
+        await amalgamator.destructible.destroy().rejected
+    }
+
+    {
+        const amalgamator = createAmalgamator({
+            stage: {
+                leaf: { split: 16, merge: 16 },
+                branch: { split: 16, merge: 16 }
+            }
+        })
+
+        await Destructible.rescue(async function () {
+            const gather = []
+
+            await amalgamator.ready
+
+            await amalgamator.count()
+
+            okay(amalgamator.status.stages.slice().pop().count != 0, 'unclean shutdown')
+
+            const path = amalgamator.status.stages[0].path
+
+            await amalgamator.locker.rotate()
+
+            okay(amalgamator.status.stages[0].path, path, 'reused empty first stage')
+
+            const snapshots = [ amalgamator.locker.snapshot() ]
+
+            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
+                for (const item of items) {
+                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+                }
+            }
+
+            okay(gather, [ 'x', 'X', 'y', 'Y', 'z', 'Z' ], 'staged')
+
+            const mutators = [ amalgamator.locker.mutator() ]
+            okay(mutators[0].mutation.version, 6, 'version advanced')
+            amalgamator.locker.release(snapshots.shift())
+            await amalgamator.merge(mutators[0], put.slice(0, 6).concat(del.slice(3)))
+            amalgamator.locker.commit(mutators.shift())
+
+            mutators.push(amalgamator.locker.mutator())
+            await amalgamator.merge(mutators[0], del.concat(del.slice(0, 3)))
+            amalgamator.locker.rollback(mutators.shift())
+
+            await amalgamator.drain()
+        })
+
+        await amalgamator.destructible.destroy().rejected
+    }
+
+    {
+        const amalgamator = createAmalgamator({ conflictable: false })
+
+        await Destructible.rescue(async function () {
+            console.log('made it')
+            const gather = []
+
+            await amalgamator.ready
+
+            const versions = new Set
+            versions.add(6)
+
+            console.log(amalgamator.status.stages.slice())
+
+            await amalgamator.recover(versions)
+
+            okay(amalgamator.status.stages.slice().pop().count != 0, 'unclean shutdown mapped')
+
+            const path = amalgamator.status.stages[0].path
+
+            await amalgamator.locker.rotate()
+
+            okay(amalgamator.status.stages[0].path, path, 'reused empty first stage mapped')
+
+            const snapshots = [ amalgamator.locker.snapshot() ]
+
+            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
+                for (const item of items) {
+                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+                }
+            }
+
+            okay(gather, [ 'a', 'A', 'b', 'B', 'c', 'C' ], 'recover mapped')
+            amalgamator.locker.release(snapshots.shift())
+
+            const mutators = [ amalgamator.locker.mutator() ]
+
+            await amalgamator.merge(mutators[0], del.concat(del.slice(0, 3)))
+
+            const rotate = amalgamator.locker.rotate()
+
+            await new Promise(resolve => setTimeout(resolve, 250))
+
+            await amalgamator.merge(mutators[0], del.concat(del.slice(0, 3)))
+            snapshots.unshift(amalgamator.locker.snapshot())
+            amalgamator.locker.rollback(mutators.shift())
+            snapshots.unshift(amalgamator.locker.snapshot())
+
+            gather.length = 0
+
+            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
+                for (const item of items) {
+                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+                }
+            }
+            amalgamator.locker.release(snapshots.shift())
+            amalgamator.locker.release(snapshots.shift())
+
+            okay(gather, [ 'a', 'A', 'b', 'B', 'c', 'C' ], 'recover rollback')
+
+            await rotate
+
+            console.log('done')
+        })
 
         await amalgamator.destructible.destroy().rejected
     }

@@ -299,16 +299,7 @@ class Amalgamator {
                 }
             }
         })
-        return {
-            groups: [ group ],
-            strata,
-            path: directory,
-            state: 'appending',
-            versions: { 0: true },
-            appending: true,
-            amalgamated: false,
-            count: 0
-        }
+        return { groups: [ group ], strata, path: directory, count: 0 }
     }
 
     async _open (options) {
@@ -318,7 +309,6 @@ class Amalgamator {
             this._open = true
             // TODO Hoist.
             let exists = true
-            this._versions = { 0: true }
             // Must be one, version zero must only come out of the primary tree.
             this._version = 1
             const files = await (async () => {
@@ -384,23 +374,22 @@ class Amalgamator {
     }
 
     async count () {
-        assert(this._groups[0].group == 1)
-        const recoveries = new Set
+        assert(~this._stages[0].groups.indexOf(1))
+        const recoveries = new Map, counts = {}
         for (const stage of this._stages.slice(1)) {
-            let count = 0
             for await (const items of mvcc.riffle.forward(stage.strata, Strata.MIN)) {
                 for (const item of items) {
                     const { version, count } = item.parts[0]
+                    recoveries.set(version, false)
                     if (counts[version] == null) {
                         counts[version] = count
                     }
                     if (--counts[version] == 0) {
-                        recoveries.add(version)
+                        recoveries.set(version, true)
                     }
-                    count++
+                    stage.count++
                 }
             }
-            stage.count = count
         }
         this.locker.recover(recoveries)
     }
@@ -414,27 +403,21 @@ class Amalgamator {
 
     //
     async recover (versions) {
-        assert(this._groups[0].group == 1)
-        const recoveries = new Set
+        assert(~this._stages[0].groups.indexOf(1))
+        const recoveries = new Map
         for (const stage of this._stages.slice(1)) {
-            let count = 0
             for await (const items of mvcc.riffle.forward(stage.strata, Strata.MIN)) {
                 for (const item of items) {
                     const { version } = item.parts[0]
-                    if (versions.has(version)) {
-                        recoveries.add(version)
-                    }
-                    count++
+                    recoveries.set(version, versions.has(version))
+                    stage.count++
                 }
             }
-            stage.count = count
         }
         this.locker.recover(recoveries)
     }
 
     iterator (snapshot, direction, key, inclusive, additional = []) {
-        const stages = this._stages.filter(stage => ! stage.amalgamated)
-
         // If we are exclusive we will use a maximum version going forward and a
         // minimum version going backward, puts us where we'd expect to be if we
         // where doing exclusive with the external key only.
@@ -594,7 +577,9 @@ class Amalgamator {
         if (stages.length == 1) {
             assert(~stages[0].groups.indexOf(group))
         } else {
-            stages.sort(left => left.groups[0] == group ? 1 : 0)
+            stages.sort(left => {
+                return ~left.groups.indexOf(group) ? -1 : 1
+            })
         }
         let cursor = Strata.nullCursor(), heft = 0
         for (
@@ -668,13 +653,8 @@ class Amalgamator {
     get status () {
         const stages = []
         for (const stage of this._stages) {
-            stages.push({
-                state: stage.state,
-                count: stage.count,
-                amalgamated: stage.amalgamated,
-                references: stage.references.slice(),
-                versions: JSON.parse(JSON.stringify(stage.versions))
-            })
+            const { groups, count, path } = stage
+            stages.push({ groups, count, path })
         }
         // TODO Impelement `Destructibe.waiting`.
         return { waiting: this._destructible.amalgamate._waiting.slice(), stages }
