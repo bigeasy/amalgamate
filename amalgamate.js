@@ -549,6 +549,7 @@ class Amalgamator {
                 this._destructible.unstage.working()
                 while (this._stages.length != 1) {
                     const stage = this._stages.pop()
+                    stage.strata.destructible.operative = 0
                     await stage.strata.destructible.destroy().destructed
                     // TODO Implement Strata.options.directory.
                     await fs.rmdir(stage.path, { recursive: true })
