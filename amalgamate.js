@@ -347,7 +347,15 @@ class Amalgamator {
                 directory: path.join(this.directory, 'primary'),
                 cache: this._cache,
                 comparator: this._comparator.primary,
-                serializer: 'buffer',
+                // TODO The shape of these options should be similar to that of
+                // Strata or Stata's option similar to the shape of these.
+                serializer: {
+                    key: {
+                        serialize: this._key.serialize,
+                        deserialize: this._key.deserialize
+                    },
+                    parts: this._parts
+                },
                 branch: this._strata.primary.branch,
                 leaf: this._strata.primary.leaf,
                 extractor: this.extractor
