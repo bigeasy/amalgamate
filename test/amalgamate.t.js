@@ -1,4 +1,4 @@
-require('proof')(23, async okay => {
+require('proof')(24, async okay => {
     function dump (object) {
         console.log(require('util').inspect(object, { depth: null }))
     }
@@ -177,7 +177,21 @@ require('proof')(23, async okay => {
                     await promises.shift()
                 }
             }
-            okay(gather, [ 'c', 'C', 'a', 'A' ], 'reverse iterator')
+            okay(gather, [ 'c', 'C', 'a', 'A' ], 'reverse iterator max')
+
+            gather.length = 0
+            iterator = amalgamator.iterator(snapshots[0], 'reverse', Buffer.from('c'), true)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
+                }
+            }
+            okay(gather, [ 'c', 'C', 'a', 'A' ], 'reverse iterator inclusive')
 
             gather.length = 0
             iterator = amalgamator.iterator(snapshots[0], 'reverse', Buffer.from('c'), false)
@@ -191,7 +205,7 @@ require('proof')(23, async okay => {
                     await promises.shift()
                 }
             }
-            okay(gather, [ 'a', 'A' ], 'reverse iterator not inclusive')
+            okay(gather, [ 'a', 'A' ], 'reverse iterator exclusive')
 
             amalgamator.locker.release(snapshots.shift())
 
@@ -203,8 +217,6 @@ require('proof')(23, async okay => {
                 assert(!mutator.conflicted)
                 amalgamator.locker.commit(mutator)
             }
-
-            console.log('--- here ---')
 
             //dump(amalgamator.locker.status)
 
@@ -386,7 +398,6 @@ require('proof')(23, async okay => {
         const amalgamator = createAmalgamator({ conflictable: false })
 
         await Destructible.rescue(async function () {
-            console.log('made it')
             const gather = []
 
             await amalgamator.ready

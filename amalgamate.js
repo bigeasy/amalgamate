@@ -103,7 +103,8 @@ class Amalgamator {
             stage: ascension([
                 options.key.compare, [ Number, -1 ], [ Number, -1 ]
             ], function (object) {
-                return [ object.value, object.version, object.order ]
+                assert(Array.isArray(object))
+                return object
             })
         }
         // Transforms an application operation into an `Amalgamator` operation.
@@ -206,14 +207,15 @@ class Amalgamator {
             directory: directory,
             comparator: {
                 zero: object => {
-                    return {
-                        value: object.value,
-                        version: Number.MAX_SAFE_INTEGER,
-                        order: Number.MAX_SAFE_INTEGER
-                    }
+                    assert(Array.isArray(object))
+                    return [
+                        object[0],
+                        Number.MAX_SAFE_INTEGER,
+                        Number.MAX_SAFE_INTEGER
+                    ]
                 },
                 leaf: this._comparator.stage,
-                branch: ascension([ this._comparator.primary ], object => [ object.value ]),
+                branch: ascension([ this._comparator.primary ], object => [ object[0] ]),
             },
             ...this._strata.stage,
             cache: this._cache,
@@ -226,18 +228,19 @@ class Amalgamator {
             // searching for optimizations.
             serializer: {
                 key: {
-                    serialize: ({ value, version, order }) => {
-                        const header = { version: version, order }
+                    serialize: (key) => {
+                        const [ value, version, order ] = key
+                        assert(value != null)
+                        const header = { version, order }
                         const buffer = Buffer.from(JSON.stringify(header))
                         return [ buffer ].concat(this._key.serialize(value))
                     },
                     deserialize: (parts) => {
                         const { version, order } = JSON.parse(parts[0].toString())
-                        return {
-                            value: this._key.deserialize(parts.slice(1)),
-                            version: version,
-                            order: order
-                        }
+                        return [
+                            this._key.deserialize(parts.slice(1)),
+                            version, order
+                        ]
                     }
                 },
                 // A memorable moment. Included in the header is the count of
@@ -296,17 +299,13 @@ class Amalgamator {
             },
             extractor: (parts) => {
                 if (parts[0].method == 'insert') {
-                    return {
-                        value: this.extractor(parts.slice(1)),
-                        version: parts[0].version,
-                        order: parts[0].order
-                    }
+                    return [
+                        this.extractor(parts.slice(1)),
+                        parts[0].version,
+                        parts[0].order
+                    ]
                 }
-                return {
-                    value: parts[1],
-                    version: parts[0].version,
-                    order: parts[0].order
-                }
+                return [ parts[1], parts[0].version, parts[0].order ]
             }
         })
         return { groups: [ group ], strata, path: directory, count: 0 }
@@ -451,22 +450,26 @@ class Amalgamator {
         // If we are exclusive we will use a maximum version going forward and a
         // minimum version going backward, puts us where we'd expect to be if we
         // where doing exclusive with the external key only.
-        const version = direction == 'forward'
-            ? inclusive ? Number.MAX_SAFE_INTEGER : 0
-            : inclusive ? 0 : Number.MAX_SAFE_INTEGER
         // TODO Not sure what no key plus exclusive means.
         const versioned = key != null
-            ? { value: key, version: version }
+            ? direction == 'forward'
+                ? inclusive
+                    ? [ key ]
+                    : [ key, 0 ]
+                : inclusive
+                    ? [ key, Number.MAX_SAFE_INTEGER ]
+                    : [ key ]
             : direction == 'forward'
                 ? Strata.MIN
                 : Strata.MAX
-        const compound = typeof versioned == 'symbol' ? versioned : versioned.value
+        const uncompound = typeof versioned == 'symbol' ? versioned : versioned[0]
 
-        const riffle = mvcc.riffle[direction](this.strata, compound, { slice: 32, inclusive })
+        const riffle = mvcc.riffle[direction](this.strata, uncompound, { slice: 32, inclusive })
+
         const primary = mvcc.twiddle(riffle, items => {
             return items.map(item => {
                 return {
-                    key: { value: item.parts[0], version: 0, order: 0 },
+                    key: [ item.parts[0], 0, 0 ],
                     parts: [{
                         method: 'insert', version: 0, order: 0
                     }, item.parts[0], item.parts[1]]
@@ -481,7 +484,7 @@ class Amalgamator {
         }).concat(primary).concat(additional)
         const homogenize = mvcc.homogenize[direction](this._comparator.stage, riffles)
         const visible = mvcc.dilute(homogenize, item => {
-            return this.locker.visible(item.key.version, snapshot) ? 1 : 0
+            return this.locker.visible(item.key[1], snapshot) ? 1 : 0
         })
         const designate = mvcc.designate[direction](this._comparator.primary, visible)
         return mvcc.dilute(designate, item => item.parts[0].method == 'remove' ? 0 : 1)
@@ -511,13 +514,13 @@ class Amalgamator {
     async _amalgamate (mutator, stage) {
         const riffle = mvcc.riffle.forward(stage.strata, Strata.MIN)
         const visible = mvcc.dilute(riffle, item => {
-            return this.locker.visible(item.key.version, mutator) ? 1 : 0
+            return this.locker.visible(item.key[1], mutator) ? 1 : 0
         })
         const designate = mvcc.designate.forward(this._comparator.primary, visible)
         await mvcc.splice(item => {
             this._destructible.amalgamate.working()
             return {
-                key: item.key.value,
+                key: item.key[0],
                 parts: item.parts[0].method == 'insert' ? item.parts.slice(1) : null
             }
         }, this.strata, designate)
@@ -574,17 +577,17 @@ class Amalgamator {
     _conflicted (mutator, items, index, key) {
         for (
             let i = index, I = items.length;
-            i < I && this.strata.compare(items[i].key.value, key) == 0;
+            i < I && this.strata.compare(items[i].key[0], key) == 0;
             i++
         ) {
-            this.locker.conflicted(items[i].key.version, mutator)
+            this.locker.conflicted(items[i].key[1], mutator)
         }
         for (
             let i = index - 1;
-            i >= 0 && this.strata.compare(items[i].key.value, key) == 0;
+            i >= 0 && this.strata.compare(items[i].key[0], key) == 0;
             i--
         ) {
-            this.locker.conflicted(items[i].key.version, mutator)
+            this.locker.conflicted(items[i].key[1], mutator)
         }
     }
 
@@ -627,7 +630,7 @@ class Amalgamator {
             const order = mutator.mutation.order++
             const transform = this._transformer(operation, order)
             return {
-                compound: { value: transform.key, version, order },
+                compound: [ transform.key, version, order ],
                 order: order,
                 ...transform
             }
@@ -645,7 +648,9 @@ class Amalgamator {
                     key, parts, method, order, compound
                 }) => {
                     if (this._conflictable) {
-                        conflictable.push({ value: key, version: 0, order: 0 })
+                        // Making a point of not landing on the first record for
+                        // scanning forwards and back unit test coverage.
+                        conflictable.push([ key, 0, 0 ])
                         this._conflicted(mutator, cursor.page.items, index, key)
                     }
                     // TODO The `version` and `order` are already in the key.
@@ -677,7 +682,7 @@ class Amalgamator {
                 const zeroed = conflictable.shift()
                 other.strata.search(promises, zeroed, cursor => {
                     const { index } = cursor
-                    this._conflicted(mutator, cursor.page.items, cursor.index, zeroed.value)
+                    this._conflicted(mutator, cursor.page.items, cursor.index, zeroed[0])
                 })
                 while (promises.length != 0) {
                     await promises.shift()
