@@ -51,6 +51,7 @@ class Locker extends events.EventEmitter {
         const mutation = {
             version: this._version++,
             created: this._order++,
+            order: 0,
             completed: Number.MAX_SAFE_INTEGER,
             rolledback: false
         }

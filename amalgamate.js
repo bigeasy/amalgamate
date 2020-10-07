@@ -3,6 +3,8 @@ const path = require('path')
 const fs = require('fs').promises
 const assert = require('assert')
 
+let count = 0
+
 // Handle or rethrow exceptions based on exception properties.
 const rescue = require('rescue')
 
@@ -98,7 +100,9 @@ class Amalgamator {
         // needs to maintain the index externally.
         this._comparator = {
             primary: options.key.compare,
-            stage: ascension([ options.key.compare, Number, Number ], function (object) {
+            stage: ascension([
+                options.key.compare, [ Number, -1 ], [ Number, -1 ]
+            ], function (object) {
                 return [ object.value, object.version, object.order ]
             })
         }
@@ -201,7 +205,13 @@ class Amalgamator {
         const strata = new Strata(this._destructible.strata.ephemeral([ 'stage', directory ]), {
             directory: directory,
             comparator: {
-                zero: object => { return { value: object.value, version: 0, order: 0 } },
+                zero: object => {
+                    return {
+                        value: object.value,
+                        version: Number.MAX_SAFE_INTEGER,
+                        order: Number.MAX_SAFE_INTEGER
+                    }
+                },
                 leaf: this._comparator.stage,
                 branch: ascension([ this._comparator.primary ], object => [ object.value ]),
             },
@@ -383,19 +393,25 @@ class Amalgamator {
 
     async count () {
         assert(~this._stages[0].groups.indexOf(1))
-        const recoveries = new Map, counts = {}
+        const recoveries = new Map, counts = {}, promises = []
         for (const stage of this._stages.slice(1)) {
-            for await (const items of mvcc.riffle.forward(stage.strata, Strata.MIN)) {
-                for (const item of items) {
-                    const { version, count } = item.parts[0]
-                    recoveries.set(version, false)
-                    if (counts[version] == null) {
-                        counts[version] = count
+            const iterator = mvcc.riffle.forward(stage.strata, Strata.MIN)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        const { version, count } = item.parts[0]
+                        recoveries.set(version, false)
+                        if (counts[version] == null) {
+                            counts[version] = count
+                        }
+                        if (--counts[version] == 0) {
+                            recoveries.set(version, true)
+                        }
+                        stage.count++
                     }
-                    if (--counts[version] == 0) {
-                        recoveries.set(version, true)
-                    }
-                    stage.count++
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
         }
@@ -412,13 +428,19 @@ class Amalgamator {
     //
     async recover (versions) {
         assert(~this._stages[0].groups.indexOf(1))
-        const recoveries = new Map
+        const recoveries = new Map, promises = []
         for (const stage of this._stages.slice(1)) {
-            for await (const items of mvcc.riffle.forward(stage.strata, Strata.MIN)) {
-                for (const item of items) {
-                    const { version } = item.parts[0]
-                    recoveries.set(version, versions.has(version))
-                    stage.count++
+            const iterator = mvcc.riffle.forward(stage.strata, Strata.MIN)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        const { version } = item.parts[0]
+                        recoveries.set(version, versions.has(version))
+                        stage.count++
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
         }
@@ -430,8 +452,8 @@ class Amalgamator {
         // minimum version going backward, puts us where we'd expect to be if we
         // where doing exclusive with the external key only.
         const version = direction == 'forward'
-            ? inclusive ? 0 : Number.MAX_SAFE_INTEGER
-            : inclusive ? Number.MAX_SAFE_INTEGER : 0
+            ? inclusive ? Number.MAX_SAFE_INTEGER : 0
+            : inclusive ? 0 : Number.MAX_SAFE_INTEGER
         // TODO Not sure what no key plus exclusive means.
         const versioned = key != null
             ? { value: key, version: version }
@@ -491,20 +513,13 @@ class Amalgamator {
     }
 
     async _amalgamate (mutator, stage) {
-        const riffle = mvcc.riffle.forward(stage.strata, Strata.MIN)[Symbol.asyncIterator]()
-        const working = {
-            [Symbol.asyncIterator]: function () { return this },
-            next: async () => {
-                const next = riffle.next()
-                this._destructible.amalgamate.working()
-                return next
-            }
-        }
-        const visible = mvcc.dilute(working, item => {
+        const riffle = mvcc.riffle.forward(stage.strata, Strata.MIN)
+        const visible = mvcc.dilute(riffle, item => {
             return this.locker.visible(item.key.version, mutator) ? 1 : 0
         })
         const designate = mvcc.designate.forward(this._comparator.primary, visible)
         await mvcc.splice(item => {
+            this._destructible.amalgamate.working()
             return {
                 key: item.key.value,
                 parts: item.parts[0].method == 'insert' ? item.parts.slice(1) : null
@@ -577,77 +592,101 @@ class Amalgamator {
         }
     }
 
+    // TODO Note that we are now racing to mark conflicts and even if we do
+    // something like rollback immediately. Already I'm considering a possible
+    // locking mechanism. Easy to reason about conflicts in one stage, but hard
+    // to reason about the race conditions when checking the second stage.
+    // Currently, inserting everything and checking the primary stage, then
+    // checking the secondary stage subsequently. If a stage running in parallel
+    // does the same thing, it should detect conflicts. What if a second stage
+    // is added during the insert, though?
+    //
+    // There was a race condition here that I didn't see before the external
+    // async change.
+    //
+    // TODO When we first detect conflicted, we can immediately mark our
+    // mutation as rolled back so that another mutator that has not already been
+    // conflicted by us, will not be conflicted by us because we'll be rolled
+    // back. We must still insert the values, though, because Memento will not
+    // report the conflict until commit is called, and during the transaction
+    // the values are going to need to be in the stages, the version valid for
+    // the mutator that holds the version, so that version ignores the rollback
+    // flag.
+    //
+    // We must still write the results after conflicted rollback, we can't say
+    // oh, well, it's going to be rolled back anyway. The transation writing
+    // these values won't know about the conflict until it ends the transaction
+    // with a commit, and it may perform queries and will expect the data it
+    // just inserted to be present.
+
+    //
     async merge (mutator, operations, counted = false) {
         const extra = counted ? { count: operations.length } : {}
         const writes = {}
         const version = mutator.mutation.version
         const group = this.locker.group(version)
         const stages = this._stages.slice(0)
-        if (stages.length == 1) {
-            assert(~stages[0].groups.indexOf(group))
-        } else {
-            stages.sort(left => {
-                return ~left.groups.indexOf(group) ? -1 : 1
-            })
-        }
-        let cursor = Strata.nullCursor(), heft = 0
-        for (
-            let found, index = 0, i = 0, I = operations.length;
-            i < I;
-            i++
-        ) {
-            const { method, key, parts, order } = this._transformer(operations[i], i)
-            const compound = { value: key, version, order }
-            // We first search for the first version of the key, and a rejection
-            // that applies to it would apply to our version.
-            for (;;) {
-                ({ index, found } = cursor.indexOf(compound))
-                if (index != null) {
-                    break
-                }
-                cursor.release()
-                cursor = await stages[0].strata.search(compound)
+        const stage = this._stages.filter(stage => ~stage.groups.indexOf(group)).pop()
+        const transforms = operations.map(operation => {
+            const order = mutator.mutation.order++
+            const transform = this._transformer(operation, order)
+            return {
+                compound: { value: transform.key, version, order },
+                ...transform
             }
-            // TODO When we first detect conflicted, we can immediately mark our
-            // mutation as rolled back so that another mutator that has not
-            // already been conflicted by us, will not be conflicted by us
-            // because we'll be rolled back. We must still insert the values,
-            // though, because Memento will not report the conflict until commit
-            // is called, and during the transaction the values are going to
-            // need to be in the stages, the version valid for the mutator that
-            // holds the version, so that version ignores the rollback flag.
-            //
-            // We must still write the results after conflicted rollback, we
-            // can't say oh, well, it's going to be rolled back anyway. The
-            // transation writing these values won't know about the conflict
-            // until it ends the transaction with a commit, and it may perform
-            // queries and will expect the data it just inserted to be present.
-            if (this._conflictable) {
-                this._conflicted(mutator, cursor.page.items, index, key)
-                if (this._stages.length == 2) {
-                    let cursor = Strata.nullCursor(), index
-                    const zeroed = { value: key, version: 0, order: 0 }
-                    for (;;) {
-                        ({ index } = cursor.indexOf(zeroed))
-                        if (index != null) {
-                            break
-                        }
-                        cursor.release()
-                        cursor = await this._stages[1].strata.search(zeroed)
+        })
+        let heft = 0
+        const conflictable = []
+        const promises = []
+        while (transforms.length != 0) {
+            stage.strata.search(promises, transforms[0].compound, cursor => {
+                const { index, found } = cursor
+                assert(!found)
+                const insert = ({
+                    index, found
+                }, {
+                    key, parts, method, order, compound
+                }) => {
+                    if (this._conflictable) {
+                        conflictable.push({ value: key, version: 0, order: 0 })
+                        this._conflicted(mutator, cursor.page.items, index, key)
                     }
-                    this._conflicted(mutator, cursor.page.items, index, key)
-                    cursor.release()
+                    // TODO The `version` and `order` are already in the key.
+                    const header = { version, method, order, ...extra }
+                    if (method == 'insert') {
+                        heft += cursor.insert(index, compound, [ header ].concat(parts), writes)
+                    } else {
+                        heft += cursor.insert(index, compound, [ header, key ], writes)
+                    }
+                }
+                insert(cursor, transforms.shift())
+                stage.count++
+                while (transforms.length != 0) {
+                    const { index, found } = cursor.indexOf(transforms[0].compound)
+                    if (index == null) {
+                        break
+                    }
+                    insert({ index, found }, transforms.shift())
+                    stage.count++
+                }
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+        }
+        const other = this._stages.filter(other => other !== stage).pop()
+        if (other != null) {
+            while (conflictable.length != 0) {
+                const zeroed = conflictable.shift()
+                other.strata.search(promises, zeroed, cursor => {
+                    const { index } = cursor
+                    this._conflicted(mutator, cursor.page.items, cursor.index, zeroed.value)
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
-            const header = { version, method, order, ...extra }
-            if (method == 'insert') {
-                heft += cursor.insert(index, compound, [ header ].concat(parts), writes)
-            } else {
-                heft += cursor.insert(index, compound, [ header, key ], writes)
-            }
-            this._stages[0].count++
         }
-        cursor.release()
         await Strata.flush(writes)
         this.locker.heft(version, heft)
     }

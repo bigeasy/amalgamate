@@ -102,9 +102,14 @@ require('proof')(23, async okay => {
 
         await Destructible.rescue(async function () {
             const snapshots = [ amalgamator.locker.snapshot() ]
-            const iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)[Symbol.asyncIterator]()
+            let iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
 
-            okay(await iterator.next(), { done: true, value: null }, 'empty')
+            const promises = []
+            iterator.next(promises, items => {})
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+            okay(iterator.done, 'empty')
 
             amalgamator.locker.release(snapshots.shift())
 
@@ -134,33 +139,57 @@ require('proof')(23, async okay => {
             snapshots.push(amalgamator.locker.snapshot())
 
             const gather = []
-            for await (const items of amalgamator.iterator(snapshots[0], 'forward', Buffer.from('a'), true)) {
-                for (const item of items) {
-                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+            iterator = amalgamator.iterator(snapshots[0], 'forward', Buffer.from('a'), true)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
             okay(gather, [ 'a', 'A', 'c', 'C' ], 'forward iterator')
 
             gather.length = 0
-            for await (const items of amalgamator.iterator(snapshots[0], 'forward', Buffer.from('a'), false)) {
-                for (const item of items) {
-                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+            iterator = amalgamator.iterator(snapshots[0], 'forward', Buffer.from('a'), false)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
             okay(gather, [ 'c', 'C' ], 'forward iterator not inclusive')
 
             gather.length = 0
-            for await (const items of amalgamator.iterator(snapshots[0], 'reverse', null, true)) {
-                for (const item of items) {
-                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+            iterator = amalgamator.iterator(snapshots[0], 'reverse', null, true)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
             okay(gather, [ 'c', 'C', 'a', 'A' ], 'reverse iterator')
 
             gather.length = 0
-            for await (const items of amalgamator.iterator(snapshots[0], 'reverse', Buffer.from('c'), false)) {
-                for (const item of items) {
-                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+            iterator = amalgamator.iterator(snapshots[0], 'reverse', Buffer.from('c'), false)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
             okay(gather, [ 'a', 'A' ], 'reverse iterator not inclusive')
@@ -176,6 +205,8 @@ require('proof')(23, async okay => {
                 amalgamator.locker.commit(mutator)
             }
 
+            console.log('--- here ---')
+
             //dump(amalgamator.locker.status)
 
             await new Promise(resolve => setTimeout(resolve, 2500))
@@ -186,9 +217,15 @@ require('proof')(23, async okay => {
 
             gather.length = 0
 
-            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
-                for (const item of items) {
-                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+            iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
             okay(gather, [
@@ -234,9 +271,17 @@ require('proof')(23, async okay => {
 
             const snapshots = [ amalgamator.locker.snapshot() ]
 
-            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
-                for (const item of items) {
-                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+            const promises = []
+            let iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
+
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
 
@@ -262,9 +307,15 @@ require('proof')(23, async okay => {
 
             gather.length = 0
 
-            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
-                for (const item of items) {
-                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+            iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
 
@@ -301,9 +352,16 @@ require('proof')(23, async okay => {
 
             const snapshots = [ amalgamator.locker.snapshot() ]
 
-            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
-                for (const item of items) {
-                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+            const promises = []
+            const iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
 
@@ -349,11 +407,18 @@ require('proof')(23, async okay => {
 
             okay(amalgamator.status.stages[0].path, path, 'reused empty first stage mapped')
 
+            const promises = []
             const snapshots = [ amalgamator.locker.snapshot() ]
 
-            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
-                for (const item of items) {
-                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+            let iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
 
@@ -375,9 +440,15 @@ require('proof')(23, async okay => {
 
             gather.length = 0
 
-            for await (const items of amalgamator.iterator(snapshots[0], 'forward', null, true)) {
-                for (const item of items) {
-                    gather.push(item.parts[1].toString(), item.parts[2].toString())
+            iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
+            while (! iterator.done) {
+                iterator.next(promises, items => {
+                    for (const item of items) {
+                        gather.push(item.parts[1].toString(), item.parts[2].toString())
+                    }
+                })
+                while (promises.length != 0) {
+                    await promises.shift()
                 }
             }
             amalgamator.locker.release(snapshots.shift())
