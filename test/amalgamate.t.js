@@ -1,4 +1,4 @@
-require('proof')(24, async okay => {
+require('proof')(30, async okay => {
     function dump (object) {
         console.log(require('util').inspect(object, { depth: null }))
     }
@@ -207,6 +207,33 @@ require('proof')(24, async okay => {
             }
             okay(gather, [ 'a', 'A' ], 'reverse iterator exclusive')
 
+            gather.length = 0
+            amalgamator.get(snapshots[0], promises, Buffer.from('a'), item => {
+                gather.push(item.parts[1].toString(), item.parts[2].toString())
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+            okay(gather, [ 'a', 'A' ], 'staged get')
+
+            gather.length = 0
+            amalgamator.get(snapshots[0], promises, Buffer.from('b'), item => {
+                gather.push(item)
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+            okay(gather, [ null ], 'staged get removed')
+
+            gather.length = 0
+            amalgamator.get(snapshots[0], promises, Buffer.from('z'), item => {
+                gather.push(item)
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+            okay(gather, [ null ], 'staged get missing')
+
             amalgamator.locker.release(snapshots.shift())
 
             for (let i = 0; i < 128; i++) {
@@ -304,6 +331,24 @@ require('proof')(24, async okay => {
                 'z', 'Z'
             ], 'amalgamate many reopen')
 
+            gather.length = 0
+            amalgamator.get(snapshots[0], promises, Buffer.from('n'), item => {
+                gather.push(item.parts[1].toString(), item.parts[2].toString())
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+            okay(gather, [ 'n', 'N' ], 'amalgamated get')
+
+            gather.length = 0
+            amalgamator.get(snapshots[0], promises, Buffer.from('a'), item => {
+                gather.push(item)
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+            okay(gather, [ null ], 'amalgamated get missing')
+
             const mutator = amalgamator.locker.mutator()
 
             okay(mutator.mutation.version, 4, 'clean shutdown')
@@ -377,6 +422,15 @@ require('proof')(24, async okay => {
             }
 
             okay(gather, [ 'x', 'X', 'y', 'Y', 'z', 'Z' ], 'staged')
+
+            gather.length = 0
+            amalgamator.get(snapshots[0], promises, Buffer.from('x'), item => {
+                gather.push(item.parts[1].toString(), item.parts[2].toString())
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+            okay(gather, [ 'x', 'X' ], 'staged get')
 
             const mutators = [ amalgamator.locker.mutator() ]
             okay(mutators[0].mutation.version, 6, 'version advanced')

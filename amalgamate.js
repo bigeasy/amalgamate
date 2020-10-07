@@ -490,6 +490,45 @@ class Amalgamator {
         return mvcc.dilute(designate, item => item.parts[0].method == 'remove' ? 0 : 1)
     }
 
+    get (snapshot, promises, key, consume) {
+        const candidates = [], stages = this._stages.slice()
+        const get = () => {
+            if (stages.length == 0) {
+                const winner = coalesce(candidates.sort(this._comparator.stage).pop(), {
+                    parts: [{ method: 'remove' }]
+                })
+                consume(winner.parts[0].method == 'remove' ? null : winner)
+            } else {
+                stages.shift().strata.search(promises, [ key ], cursor => {
+                    let { index, page: { items } } = cursor
+                    while (
+                        index < items.length &&
+                        this._comparator.primary(items[index].key[0], key) == 0
+                    ) {
+                        if (this.locker.visible(items[index].key[1], snapshot)) {
+                            candidates.push(items[index])
+                            break
+                        }
+                        index++
+                    }
+                    get()
+                })
+            }
+        }
+        this.strata.search(promises, key, cursor => {
+            const { index, found, page: { items } } = cursor
+            if (cursor.found) {
+                candidates.push({
+                    key: [ items[index].key, 0, 0 ],
+                    parts: [{
+                        method: 'insert', version: 0, order: 0
+                    }].concat(items[index].parts)
+                })
+            }
+            get()
+        })
+    }
+
     // When our writing stage has no writes, don't rotate it, just push the
     // group onto its array of group ids. Otherwise, create a new stage and
     // unshift it onto our list of stages.
