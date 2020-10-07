@@ -50,11 +50,10 @@ require('proof')(30, async okay => {
                 serialize: function (parts) { return parts },
                 deserialize: function (parts) { return parts }
             },
-            transformer: function (operation, order) {
+            transformer: function (operation) {
                 if (operation.type == 'put') {
                     return {
                         method: 'insert',
-                        order: order,
                         key: operation.key,
                         parts: [ operation.key, operation.value ]
                     }
