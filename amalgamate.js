@@ -464,15 +464,11 @@ class Amalgamator {
 
         const riffle = mvcc.riffle[direction](this.strata, compound, { slice: 32, inclusive })
         const primary = mvcc.twiddle(riffle, items => {
-            // TODO Looks like I'm in the habit of adding extra stuff, meta stuff,
-            // so the records, so go back and ensure that I'm allowing this,
-            // forwarding the meta information.
             return items.map(item => {
                 return {
                     key: { value: item.parts[0], version: 0, order: 0 },
                     parts: [{
-                        header: { method: 'put' },
-                        version: 0
+                        method: 'insert', version: 0, order: 0
                     }, item.parts[0], item.parts[1]]
                 }
             })
@@ -632,6 +628,7 @@ class Amalgamator {
             const transform = this._transformer(operation, order)
             return {
                 compound: { value: transform.key, version, order },
+                order: order,
                 ...transform
             }
         })

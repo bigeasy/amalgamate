@@ -61,7 +61,6 @@ require('proof')(23, async okay => {
                 }
                 return {
                     method: 'remove',
-                    order: order,
                     key: operation.key
                 }
             },
