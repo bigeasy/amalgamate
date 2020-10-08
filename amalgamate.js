@@ -11,6 +11,8 @@ const rescue = require('rescue')
 // Return the first non-`null`-like value.
 const coalesce = require('extant')
 
+const Trampoline = require('skip')
+
 // Sort function generator.
 const ascension = require('ascension')
 
@@ -392,11 +394,11 @@ class Amalgamator {
 
     async count () {
         assert(~this._stages[0].groups.indexOf(1))
-        const recoveries = new Map, counts = {}, promises = []
+        const recoveries = new Map, counts = {}, trampoline = new Trampoline
         for (const stage of this._stages.slice(1)) {
             const iterator = mvcc.riffle.forward(stage.strata, Strata.MIN)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         const { version, count } = item.parts[0]
                         recoveries.set(version, false)
@@ -409,8 +411,8 @@ class Amalgamator {
                         stage.count++
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
         }
@@ -427,19 +429,19 @@ class Amalgamator {
     //
     async recover (versions) {
         assert(~this._stages[0].groups.indexOf(1))
-        const recoveries = new Map, promises = []
+        const recoveries = new Map, trampoline = new Trampoline
         for (const stage of this._stages.slice(1)) {
             const iterator = mvcc.riffle.forward(stage.strata, Strata.MIN)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         const { version } = item.parts[0]
                         recoveries.set(version, versions.has(version))
                         stage.count++
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
         }
@@ -490,7 +492,7 @@ class Amalgamator {
         return mvcc.dilute(designate, item => item.parts[0].method == 'remove' ? 0 : 1)
     }
 
-    get (snapshot, promises, key, consume) {
+    get (snapshot, trampoline, key, consume) {
         const candidates = [], stages = this._stages.slice()
         const get = () => {
             if (stages.length == 0) {
@@ -499,7 +501,7 @@ class Amalgamator {
                 })
                 consume(winner.parts[0].method == 'remove' ? null : winner)
             } else {
-                stages.shift().strata.search(promises, [ key ], cursor => {
+                stages.shift().strata.search(trampoline, [ key ], cursor => {
                     let { index, page: { items } } = cursor
                     while (
                         index < items.length &&
@@ -515,7 +517,7 @@ class Amalgamator {
                 })
             }
         }
-        this.strata.search(promises, key, cursor => {
+        this.strata.search(trampoline, key, cursor => {
             const { index, found, page: { items } } = cursor
             if (cursor.found) {
                 candidates.push({
@@ -676,9 +678,9 @@ class Amalgamator {
         })
         let heft = 0
         const conflictable = []
-        const promises = []
+        const trampoline = new Trampoline
         while (transforms.length != 0) {
-            stage.strata.search(promises, transforms[0].compound, cursor => {
+            stage.strata.search(trampoline, transforms[0].compound, cursor => {
                 const { index, found } = cursor
                 assert(!found)
                 const insert = ({
@@ -711,20 +713,20 @@ class Amalgamator {
                     stage.count++
                 }
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         const other = this._stages.filter(other => other !== stage).pop()
         if (other != null) {
             while (conflictable.length != 0) {
                 const zeroed = conflictable.shift()
-                other.strata.search(promises, zeroed, cursor => {
+                other.strata.search(trampoline, zeroed, cursor => {
                     const { index } = cursor
                     this._conflicted(mutator, cursor.page.items, cursor.index, zeroed[0])
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
         }

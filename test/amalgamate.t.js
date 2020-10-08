@@ -8,6 +8,7 @@ require('proof')(30, async okay => {
     const path = require('path')
     const fs = require('fs').promises
 
+    const Trampoline = require('skip')
     const Destructible = require('destructible')
     const Amalgamator = require('..')
     const Locker = require('../locker')
@@ -102,10 +103,10 @@ require('proof')(30, async okay => {
             const snapshots = [ amalgamator.locker.snapshot() ]
             let iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
 
-            const promises = []
-            iterator.next(promises, items => {})
-            while (promises.length != 0) {
-                await promises.shift()
+            const trampoline = new Trampoline
+            iterator.next(trampoline, items => {})
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
             okay(iterator.done, 'empty')
 
@@ -139,13 +140,13 @@ require('proof')(30, async okay => {
             const gather = []
             iterator = amalgamator.iterator(snapshots[0], 'forward', Buffer.from('a'), true)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
             okay(gather, [ 'a', 'A', 'c', 'C' ], 'forward iterator')
@@ -153,13 +154,13 @@ require('proof')(30, async okay => {
             gather.length = 0
             iterator = amalgamator.iterator(snapshots[0], 'forward', Buffer.from('a'), false)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
             okay(gather, [ 'c', 'C' ], 'forward iterator not inclusive')
@@ -167,13 +168,13 @@ require('proof')(30, async okay => {
             gather.length = 0
             iterator = amalgamator.iterator(snapshots[0], 'reverse', null, true)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
             okay(gather, [ 'c', 'C', 'a', 'A' ], 'reverse iterator max')
@@ -181,13 +182,13 @@ require('proof')(30, async okay => {
             gather.length = 0
             iterator = amalgamator.iterator(snapshots[0], 'reverse', Buffer.from('c'), true)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
             okay(gather, [ 'c', 'C', 'a', 'A' ], 'reverse iterator inclusive')
@@ -195,41 +196,41 @@ require('proof')(30, async okay => {
             gather.length = 0
             iterator = amalgamator.iterator(snapshots[0], 'reverse', Buffer.from('c'), false)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
             okay(gather, [ 'a', 'A' ], 'reverse iterator exclusive')
 
             gather.length = 0
-            amalgamator.get(snapshots[0], promises, Buffer.from('a'), item => {
+            amalgamator.get(snapshots[0], trampoline, Buffer.from('a'), item => {
                 gather.push(item.parts[1].toString(), item.parts[2].toString())
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
             okay(gather, [ 'a', 'A' ], 'staged get')
 
             gather.length = 0
-            amalgamator.get(snapshots[0], promises, Buffer.from('b'), item => {
+            amalgamator.get(snapshots[0], trampoline, Buffer.from('b'), item => {
                 gather.push(item)
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
             okay(gather, [ null ], 'staged get removed')
 
             gather.length = 0
-            amalgamator.get(snapshots[0], promises, Buffer.from('z'), item => {
+            amalgamator.get(snapshots[0], trampoline, Buffer.from('z'), item => {
                 gather.push(item)
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
             okay(gather, [ null ], 'staged get missing')
 
@@ -256,13 +257,13 @@ require('proof')(30, async okay => {
 
             iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
             okay(gather, [
@@ -308,17 +309,17 @@ require('proof')(30, async okay => {
 
             const snapshots = [ amalgamator.locker.snapshot() ]
 
-            const promises = []
+            const trampoline = new Trampoline
             let iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
 
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
 
@@ -331,20 +332,20 @@ require('proof')(30, async okay => {
             ], 'amalgamate many reopen')
 
             gather.length = 0
-            amalgamator.get(snapshots[0], promises, Buffer.from('n'), item => {
+            amalgamator.get(snapshots[0], trampoline, Buffer.from('n'), item => {
                 gather.push(item.parts[1].toString(), item.parts[2].toString())
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
             okay(gather, [ 'n', 'N' ], 'amalgamated get')
 
             gather.length = 0
-            amalgamator.get(snapshots[0], promises, Buffer.from('a'), item => {
+            amalgamator.get(snapshots[0], trampoline, Buffer.from('a'), item => {
                 gather.push(item)
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
             okay(gather, [ null ], 'amalgamated get missing')
 
@@ -364,13 +365,13 @@ require('proof')(30, async okay => {
 
             iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
 
@@ -407,27 +408,27 @@ require('proof')(30, async okay => {
 
             const snapshots = [ amalgamator.locker.snapshot() ]
 
-            const promises = []
+            const trampoline = new Trampoline
             const iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
 
             okay(gather, [ 'x', 'X', 'y', 'Y', 'z', 'Z' ], 'staged')
 
             gather.length = 0
-            amalgamator.get(snapshots[0], promises, Buffer.from('x'), item => {
+            amalgamator.get(snapshots[0], trampoline, Buffer.from('x'), item => {
                 gather.push(item.parts[1].toString(), item.parts[2].toString())
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
             okay(gather, [ 'x', 'X' ], 'staged get')
 
@@ -470,18 +471,18 @@ require('proof')(30, async okay => {
 
             okay(amalgamator.status.stages[0].path, path, 'reused empty first stage mapped')
 
-            const promises = []
+            const trampoline = new Trampoline
             const snapshots = [ amalgamator.locker.snapshot() ]
 
             let iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
 
@@ -505,13 +506,13 @@ require('proof')(30, async okay => {
 
             iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
             while (! iterator.done) {
-                iterator.next(promises, items => {
+                iterator.next(trampoline, items => {
                     for (const item of items) {
                         gather.push(item.parts[1].toString(), item.parts[2].toString())
                     }
                 })
-                while (promises.length != 0) {
-                    await promises.shift()
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
             }
             amalgamator.locker.release(snapshots.shift())
