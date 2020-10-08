@@ -22,21 +22,21 @@
     },
     "dependencies":
     {
-                            "b-tree":                       "^2.0.0-alpha.45",
-                            "designate":                    "^2.0.0-alpha.9",
-                            "dilute":                       "^2.0.0-alpha.5",
+                            "b-tree":                       "2.0.0-alpha.46",
+                            "designate":                    "2.0.0-alpha.9",
+                            "dilute":                       "2.0.0-alpha.5",
                             "extant":                       "^1.0.20",
-                            "homogenize":                   "^2.0.0-alpha.6",
+                            "homogenize":                   "2.0.0-alpha.7",
                             "interrupt":                    "^10.1.0",
-                            "rescue":                       "^7.0.0-alpha.1",
-                            "riffle":                       "^2.0.0-alpha.26",
+                            "rescue":                       "7.0.0-alpha.1",
+                            "riffle":                       "2.0.0-alpha.29",
                             "skip":                         "0.1.0",
-                            "splice":                       "^3.0.0-alpha.15",
-                            "twiddle":                      "^2.0.0-alpha.6"
+                            "splice":                       "3.0.0-alpha.16",
+                            "twiddle":                      "2.0.0-alpha.6"
     },
     "devDependencies":
     {
-                            "destructible":                 "^7.0.0-alpha.11",
+                            "destructible":                 "7.0.0-alpha.11",
                             "proof":                        "^9.0.2",
                             "prospective":                  "^0.3.0"
     },
