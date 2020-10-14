@@ -32,6 +32,9 @@ require('proof')(30, async okay => {
         return { type: 'del', key: Buffer.from(letter) }
     })
 
+    const locker = new Locker({ heft: 1024 })
+    await locker.rotate()
+
     function createAmalgamator (options) {
         const destructible = new Destructible(10000, 'amalgamate.t')
         return new Amalgamator(destructible, {

@@ -238,8 +238,12 @@ class Locker extends events.EventEmitter {
 
     rotate () {
         return new Promise(resolve => {
-            this._heft.unshift({ max: -1, resolve })
-            this._maybeRotate()
+            if (this._amalgamators.size == 0) {
+                resolve()
+            } else {
+                this._heft.unshift({ max: -1, resolve })
+                this._maybeRotate()
+            }
         })
     }
 
