@@ -31,7 +31,7 @@
                             "rescue":                       "7.0.0-alpha.1",
                             "riffle":                       "2.0.0-alpha.32",
                             "skip":                         "0.1.0",
-                            "splice":                       "3.0.0-alpha.18",
+                            "splice":                       "3.0.0-alpha.19",
                             "twiddle":                      "2.0.0-alpha.6"
     },
     "devDependencies":
