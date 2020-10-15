@@ -189,6 +189,8 @@ class Amalgamator {
                 await this._destructible.amalgamate.destroy().destructed
                 this._destructible.strata.decrement()
                 await this._destructible.strata.destructed
+                this.locker.unregister(this)
+                // TODO Heh. No!
                 this._cache.purge(0)
             })
         })

@@ -24,6 +24,10 @@ class Locker extends events.EventEmitter {
         return this._groups[0].group
     }
 
+    unregister (amalgamator) {
+        this._amalgamators.delete(amalgamator)
+    }
+
     recover (versions) {
         assert(this._groups[0].group == 1 && this._groups[0].heft == 0)
         for (const [ version, committed ] of versions) {
