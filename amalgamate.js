@@ -187,8 +187,8 @@ class Amalgamator {
                 }
             }
         }
-        destructible.destruct(() => this._open = false)
-        destructible.close(() => {
+        destructible.destruct(() => {
+            this._open = false
             destructible.ephemeral('shutdown', async () => {
                 await this._destructible.amalgamate.destroy().destructed
                 this._destructible.strata.decrement()
@@ -566,7 +566,7 @@ class Amalgamator {
         })
         const designate = mvcc.designate.forward(this._comparator.primary, visible)
         await mvcc.splice(item => {
-            this._destructible.amalgamate.working()
+            this._destructible.amalgamate.progress()
             return {
                 key: item.key[0],
                 parts: item.parts[0].method == 'insert' ? item.parts.slice(1) : null
@@ -608,14 +608,14 @@ class Amalgamator {
             this.locker.unstaged(this)
         } else {
             this._destructible.unstage.ephemeral([ 'unstage', this._stages[1].path ], async () => {
-                this._destructible.unstage.working()
+                this._destructible.unstage.progress()
                 while (this._stages.length != 1) {
                     const stage = this._stages.pop()
                     stage.strata.destructible.operative = 0
                     await stage.strata.destructible.destroy().destructed
                     // TODO Implement Strata.options.directory.
                     await fs.rmdir(stage.path, { recursive: true })
-                    this._destructible.unstage.working()
+                    this._destructible.unstage.progress()
                 }
                 this.locker.unstaged(this)
             })
