@@ -56,7 +56,11 @@ const Strata = require('b-tree')
 
 //
 class Amalgamator {
-    static Error = Interrupt.create('Amalgamator.Error')
+    static Error = Interrupt.create('Amalgamator.Error', {
+        DOES_NOT_EXIST: 'database does not exist',
+        NOT_A_DATABASE: 'database directory does not contain a database',
+        ALREADY_EXISTS: 'attempted to create a database where one already exists'
+    })
 
     // Options.
     //
@@ -317,6 +321,7 @@ class Amalgamator {
 
     async _open (options) {
         try {
+            const directory = this.directory
             const createIfMissing = coalesce(options.createIfMissing, true)
             const errorIfExists = coalesce(options.errorIfExists, false)
             this._open = true
@@ -327,13 +332,13 @@ class Amalgamator {
             const files = await (async () => {
                 for (;;) {
                     try {
-                        return await fs.readdir(this.directory)
+                        return await fs.readdir(directory)
                     } catch (error) {
                         await rescue(error, [{ code: 'ENOENT' }])
                         if (!createIfMissing) {
-                            throw new Amalgamator.Error('database does not exist')
+                            throw new Amalgamator.Error('DOES_NOT_EXIST', { directory })
                         }
-                        await fs.mkdir(this.directory, { recursive: true })
+                        await fs.mkdir(directory, { recursive: true })
                     }
                 }
             }) ()
@@ -344,20 +349,20 @@ class Amalgamator {
             // TODO Not a very clever recover, something might be in the midst
             // of a rotation.
             } else if (!subdirs.every(file => sorted.shift() == file) || sorted.length) {
-                throw new Amalgamator.Error('not a Locket datastore')
+                throw new Amalgamator.Error('NOT_A_DATABASE', { directory })
             }
             if (exists && errorIfExists) {
-                throw new Amalgamator.Error('database already exists')
+                throw new Amalgamator.Error('ALREADY_EXISTS', { directory })
             }
             if (!exists) {
                 for (const dir of subdirs) {
-                    await fs.mkdir(path.join(this.directory, dir), { recursive: true })
+                    await fs.mkdir(path.join(directory, dir), { recursive: true })
                 }
             }
             // TODO Either use destructible correctly or bring it internal to
             // Strata.
             this.strata = new Strata(this._destructible.strata.durable('primary'), {
-                directory: path.join(this.directory, 'primary'),
+                directory: path.join(directory, 'primary'),
                 cache: this._cache,
                 comparator: this._comparator.primary,
                 // TODO The shape of these options should be similar to that of
@@ -373,20 +378,20 @@ class Amalgamator {
                 leaf: this._strata.primary.leaf,
                 extractor: this.extractor
             })
-            if ((await fs.readdir(path.join(this.directory, 'primary'))).length != 0) {
+            if ((await fs.readdir(path.join(directory, 'primary'))).length != 0) {
                 await this.strata.open()
             } else {
                 await this.strata.create()
             }
-            const staging = path.join(this.directory, 'staging')
+            const staging = path.join(directory, 'staging')
             for (const file of await fs.readdir(staging)) {
                 const stage = this._newStage(path.join(staging, file), 0)
                 await stage.strata.open()
                 this._stages.unshift(stage)
             }
-            const directory = path.join(staging, this._filestamp())
-            await fs.mkdir(directory, { recursive: true })
-            const stage = this._newStage(directory, this.locker.register(this))
+            const latest = path.join(staging, this._filestamp())
+            await fs.mkdir(latest, { recursive: true })
+            const stage = this._newStage(latest, this.locker.register(this))
             await stage.strata.create()
             this._stages.unshift(stage)
         } finally {

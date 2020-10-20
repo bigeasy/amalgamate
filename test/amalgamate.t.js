@@ -83,7 +83,7 @@ require('proof')(30, async okay => {
         try {
             await createAmalgamator({ directory: __dirname }).destructible.rejected
         } catch (error) {
-            rescue(error, [ Amalgamator.Error, /not a Locket/ ])
+            rescue(error, [ Amalgamator.Error, { code: 'NOT_A_DATABASE' } ])
             okay('not an appropriate directory')
         }
     }
@@ -92,7 +92,7 @@ require('proof')(30, async okay => {
         try {
             await createAmalgamator({ createIfMissing: false }).destructible.rejected
         } catch (error) {
-            rescue(error, [ Amalgamator.Error, /does not exist/ ])
+            rescue(error, [ Amalgamator.Error, { code: 'DOES_NOT_EXIST' } ])
             okay('does not exist')
         }
     }
@@ -287,7 +287,7 @@ require('proof')(30, async okay => {
         try {
             await createAmalgamator({ errorIfExists: true }).destructible.rejected
         } catch (error) {
-            rescue(error, [ Amalgamator.Error, /already exists/ ])
+            rescue(error, [ Amalgamator.Error, { code: 'ALREADY_EXISTS' } ])
             okay('error if exists')
         }
     }

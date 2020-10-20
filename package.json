@@ -27,7 +27,7 @@
                             "dilute":                       "2.0.0-alpha.5",
                             "extant":                       "^1.0.20",
                             "homogenize":                   "2.0.0-alpha.7",
-                            "interrupt":                    "^10.1.0",
+                            "interrupt":                    "11.0.0-alpha.1",
                             "rescue":                       "7.0.0-alpha.1",
                             "riffle":                       "2.0.0-alpha.36",
                             "skip":                         "0.1.0",
