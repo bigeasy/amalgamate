@@ -478,10 +478,10 @@ class Amalgamator {
         const primary = mvcc.twiddle(riffle, items => {
             return items.map(item => {
                 return {
-                    key: [ item.parts[0], 0, 0 ],
+                    key: [ item.key, 0, 0 ],
                     parts: [{
                         method: 'insert', version: 0, order: 0
-                    }, item.parts[0], item.parts[1]]
+                    }].concat(item.parts)
                 }
             })
         })
