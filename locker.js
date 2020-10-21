@@ -3,7 +3,7 @@ const events = require('events')
 const noop = require('nop')
 
 class Locker extends events.EventEmitter {
-    constructor ({ heft, restoration = new Set }) {
+    constructor ({ heft }) {
         super()
         this._heft = [{ max: heft }]
         this._group = 1
