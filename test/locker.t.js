@@ -1,4 +1,4 @@
-require('proof')(15, async okay => {
+require('proof')(16, async okay => {
     const once = require('prospective/once')
 
     class Amalgamator {
@@ -23,6 +23,8 @@ require('proof')(15, async okay => {
         }
     }
 
+    const amalgamated = []
+
     const Locker = require('../locker')
     const locker = new Locker({ heft: 32 })
 
@@ -30,6 +32,8 @@ require('proof')(15, async okay => {
     recover.set(2, true)
     recover.set(3, false)
     locker.recover(recover)
+
+    locker.on('amalgamated', (exclusive, inclusive) => amalgamated.push(exclusive, inclusive))
 
     function dump () {
         console.log(require('util').inspect(locker.status, { depth: null }))
@@ -108,6 +112,8 @@ require('proof')(15, async okay => {
     await locker.rotate()
 
     okay('done')
+
+    okay(amalgamated, [ 1, 7, 7, 8 ], 'amalgamated')
 
     //dump()
 })

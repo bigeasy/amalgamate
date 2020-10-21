@@ -52,8 +52,14 @@ class Locker extends events.EventEmitter {
 
     mutator () {
         assert(this._shutdown == null)
+        // The mutation with its nested `completed` that is uncompleted,
+        // therefore `MAX_SAFE_INTEGER`, not to be confused with the one we're
+        // merging from the `snapshot()`.
         const mutation = {
             version: this._version++,
+            // TODO Create is not used, but to remove it you should add
+            // assertions to your unit test for Locker. Use variables instead of
+            // constants to test `visible` and `conflicted`.
             created: this._order++,
             order: 0,
             completed: Number.MAX_SAFE_INTEGER,
@@ -152,6 +158,9 @@ class Locker extends events.EventEmitter {
         this._groups.unshift({
             state: 'appending',
             group: group,
+            // TODO We need rules for min and max. Currently `min` is exclusive
+            // and `max` is inclusive. Either both exclusive or inclusive,
+            // exclusive like `slice()`.
             min: this._version,
             max: this._version,
             mutations: new Map,
@@ -217,7 +226,8 @@ class Locker extends events.EventEmitter {
         assert(!this._groups[1].unstaged.has(amalgamator))
         this._groups[1].unstaged.add(amalgamator)
         if (this._groups[1].unstaged.size == this._amalgamators.size) {
-            this._groups.pop()
+            const group = this._groups.pop()
+            this.emit('amalgamated', group.min, group.max)
             while (this._unstaged.length != 0) {
                 this._unstaged.shift().resolve.call()
             }
