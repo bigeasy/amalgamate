@@ -30,7 +30,7 @@
                             "interrupt":                    "11.0.0-alpha.1",
                             "rescue":                       "7.0.0-alpha.1",
                             "riffle":                       "2.0.0-alpha.37",
-                            "skip":                         "0.1.0",
+                            "skip":                         "0.1.1",
                             "splice":                       "3.0.0-alpha.24",
                             "twiddle":                      "2.0.0-alpha.6"
     },
