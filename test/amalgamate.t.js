@@ -8,7 +8,7 @@ require('proof')(30, async okay => {
     const path = require('path')
     const fs = require('fs').promises
 
-    const Trampoline = require('skip')
+    const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
     const Amalgamator = require('..')
     const Locker = require('../locker')

@@ -11,7 +11,7 @@ const rescue = require('rescue')
 // Return the first non-`null`-like value.
 const coalesce = require('extant')
 
-const Trampoline = require('skip')
+const Trampoline = require('reciprocate')
 
 // Sort function generator.
 const ascension = require('ascension')
