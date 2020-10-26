@@ -486,7 +486,6 @@ class Amalgamator {
                 extractor: $ => [ extractor($) ],
                 filter: (sought, items, index) => {
                     const key = items[index].key
-                    console.log(key)
                     return this._comparator.stage([ sought[0], key[1], key[2] ], key) == 0
                 }
             })
