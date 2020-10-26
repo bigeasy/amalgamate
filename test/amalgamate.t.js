@@ -1,4 +1,4 @@
-require('proof')(30, async okay => {
+require('proof')(33, async okay => {
     function dump (object) {
         console.log(require('util').inspect(object, { depth: null }))
     }
@@ -209,6 +209,44 @@ require('proof')(30, async okay => {
                 }
             }
             okay(gather, [ 'a', 'A' ], 'reverse iterator exclusive')
+
+            const set = [ 'a', 'b', 'c', 'd', 'e' ]
+            iterator = amalgamator.set(snapshots[0], set.map(letter => Buffer.from(letter)), {
+                additional: [[{
+                    key: [ Buffer.from('e'), Number.MAX_SAFE_INTEGER, 0 ],
+                    parts: [{
+                        method: 'insert',
+                        version: Math.MAX_SAFE_INTEGER,
+                        order: 0
+                    }, Buffer.from('e'), Buffer.from('E') ]
+                }]]
+            })
+
+            gather.length = 0
+            while (! iterator.done) {
+                iterator.next(trampoline, items => {
+                    for (const item of items) {
+                        gather.push({
+                            key: item.key[0].toString(),
+                            method: item.parts[0].method
+                        })
+                    }
+                })
+                while (trampoline.seek()) {
+                    await trampoline.shift()
+                }
+            }
+            okay(gather, [{
+                key: 'a', method: 'insert',
+            }, {
+                key: 'b', method: 'remove',
+            }, {
+                key: 'c', method: 'insert',
+            }, {
+                key: 'd', method: 'remove',
+            }, {
+                key: 'e', method: 'insert',
+            }], 'set staged')
 
             gather.length = 0
             amalgamator.get(snapshots[0], trampoline, Buffer.from('a'), item => {
@@ -426,6 +464,41 @@ require('proof')(30, async okay => {
 
             okay(gather, [ 'x', 'X', 'y', 'Y', 'z', 'Z' ], 'staged')
 
+            const set = amalgamator.set(snapshots[0], [ 'v', 'w', 'x', 'z' ].map(letter => Buffer.from(letter)), {
+                additional: [[{
+                    key: [ Buffer.from('v'), Math.MAX_SAFE_INTEGER, 0 ],
+                    parts: [{
+                        method: 'insert',
+                        version: Number.MAX_SAFE_INTEGER,
+                        order: 0
+                    }, Buffer.from('v'), Buffer.from('V') ]
+                }]]
+            })
+
+            gather.length = 0
+            while (! set.done) {
+                set.next(trampoline, items => {
+                    for (const item of items) {
+                        gather.push({
+                            key: item.key[0].toString(),
+                            method: item.parts[0].method
+                        })
+                    }
+                })
+                while (trampoline.seek()) {
+                    await trampoline.shift()
+                }
+            }
+            okay(gather, [{
+                key: 'v', method: 'remove',
+            }, {
+                key: 'w', method: 'remove',
+            }, {
+                key: 'x', method: 'insert',
+            }, {
+                key: 'z', method: 'insert',
+            }], 'set staged')
+
             gather.length = 0
             amalgamator.get(snapshots[0], trampoline, Buffer.from('x'), item => {
                 gather.push(item.parts[1].toString(), item.parts[2].toString())
@@ -518,10 +591,33 @@ require('proof')(30, async okay => {
                     await trampoline.shift()
                 }
             }
-            amalgamator.locker.release(snapshots.shift())
-            amalgamator.locker.release(snapshots.shift())
 
-            okay(gather, [ 'a', 'A', 'b', 'B', 'c', 'C' ], 'recover rollback')
+            okay(gather, [ 'a', 'A', 'b', 'B', 'c', 'C' ], 'rollback forward')
+
+            iterator = amalgamator.set(snapshots[0], [ 'a', 'd' ].map(letter => Buffer.from(letter)))
+            gather.length = 0
+            while (! iterator.done) {
+                iterator.next(trampoline, items => {
+                    for (const item of items) {
+                        gather.push({
+                            key: item.key[0].toString(),
+                            method: item.parts[0].method
+                        })
+                    }
+                })
+                while (trampoline.seek()) {
+                    await trampoline.shift()
+                }
+            }
+
+            okay(gather, [{
+                key: 'a', method: 'insert'
+            }, {
+                key: 'd', method: 'remove'
+            }], 'rollback set')
+
+            amalgamator.locker.release(snapshots.shift())
+            amalgamator.locker.release(snapshots.shift())
 
             await rotate
 

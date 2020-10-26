@@ -71,7 +71,11 @@ class Locker extends events.EventEmitter {
     }
 
     visible (version, { completed, mutation: current = null }) {
-        if (version == 0 || (current != null && current.version == version)) {
+        if (
+            version == 0 ||
+            version == Number.MAX_SAFE_INTEGER ||
+            (current != null && current.version == version)
+        ) {
             return true
         }
         const group = this._groupByVersion(version)

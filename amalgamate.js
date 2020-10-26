@@ -30,6 +30,8 @@ const mvcc = {
     homogenize: require('homogenize'),
     // Iterate through a Strata b-tree.
     riffle: require('riffle'),
+    // Retrieve a set of values from a Strata b-tree.
+    skip: require('skip'),
     // Convert iterator results with a conversion function.
     twiddle: require('twiddle'),
     // Splice a versioned staging tree into a primary tree.
@@ -453,6 +455,48 @@ class Amalgamator {
             }
         }
         this.locker.recover(recoveries)
+    }
+
+    set (snapshot, set, { extractor = $ => $, additional = [] } = {}) {
+        const skip = mvcc.skip.strata(this.strata, set, { extractor })
+        const primary = mvcc.twiddle(skip, items => {
+            return items.map(({ key, parts, value }) => {
+                return {
+                    key: [ key, 0, 0 ],
+                    parts: [{
+                        method: parts == null ? 'remove' : 'insert',
+                        version: 0,
+                        order: 0
+                    }].concat(parts == null ? [] : parts),
+                    value
+                }
+            })
+        })
+        const skips = this._stages.map(stage => {
+            const skip = mvcc.skip.strata(stage.strata, set, {
+                extractor: $ => [ extractor($) ],
+                filter: (sought, items, index) => {
+                    const key = items[index].key
+                    return this._comparator.stage([ sought[0], key[1], key[2] ], key) == 0
+                }
+            })
+            return mvcc.dilute(skip, item => item.parts == null ? 0 : 1)
+        }).concat(primary).concat(additional.map(array => {
+            const skip = mvcc.skip.array(this._comparator.stage, array, set, {
+                extractor: $ => [ extractor($) ],
+                filter: (sought, items, index) => {
+                    const key = items[index].key
+                    console.log(key)
+                    return this._comparator.stage([ sought[0], key[1], key[2] ], key) == 0
+                }
+            })
+            return mvcc.dilute(skip, item => item.parts == null ? 0 : 1)
+        }))
+        const homogenize = mvcc.homogenize.forward(this._comparator.stage, skips)
+        const visible = mvcc.dilute(homogenize, item => {
+            return this.locker.visible(item.key[1], snapshot) ? 1 : 0
+        })
+        return mvcc.designate.forward(this._comparator.primary, visible)
     }
 
     iterator (snapshot, direction, key, inclusive, additional = []) {
