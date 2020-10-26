@@ -211,7 +211,7 @@ require('proof')(33, async okay => {
             okay(gather, [ 'a', 'A' ], 'reverse iterator exclusive')
 
             const set = [ 'a', 'b', 'c', 'd', 'e' ]
-            iterator = amalgamator.set(snapshots[0], set.map(letter => Buffer.from(letter)), {
+            iterator = amalgamator.map(snapshots[0], set.map(letter => Buffer.from(letter)), {
                 additional: [[{
                     key: [ Buffer.from('e'), Number.MAX_SAFE_INTEGER, 0 ],
                     parts: [{
@@ -464,7 +464,7 @@ require('proof')(33, async okay => {
 
             okay(gather, [ 'x', 'X', 'y', 'Y', 'z', 'Z' ], 'staged')
 
-            const set = amalgamator.set(snapshots[0], [ 'v', 'w', 'x', 'z' ].map(letter => Buffer.from(letter)), {
+            const set = amalgamator.map(snapshots[0], [ 'v', 'w', 'x', 'z' ].map(letter => Buffer.from(letter)), {
                 additional: [[{
                     key: [ Buffer.from('v'), Math.MAX_SAFE_INTEGER, 0 ],
                     parts: [{
@@ -594,7 +594,7 @@ require('proof')(33, async okay => {
 
             okay(gather, [ 'a', 'A', 'b', 'B', 'c', 'C' ], 'rollback forward')
 
-            iterator = amalgamator.set(snapshots[0], [ 'a', 'd' ].map(letter => Buffer.from(letter)))
+            iterator = amalgamator.map(snapshots[0], [ 'a', 'd' ].map(letter => Buffer.from(letter)))
             gather.length = 0
             while (! iterator.done) {
                 iterator.next(trampoline, items => {

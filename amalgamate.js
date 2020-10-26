@@ -457,7 +457,7 @@ class Amalgamator {
         this.locker.recover(recoveries)
     }
 
-    set (snapshot, set, { extractor = $ => $, additional = [] } = {}) {
+    map (snapshot, set, { extractor = $ => $, additional = [] } = {}) {
         const skip = mvcc.skip.strata(this.strata, set, { extractor })
         const primary = mvcc.twiddle(skip, items => {
             return items.map(({ key, parts, value }) => {
