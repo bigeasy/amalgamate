@@ -8,7 +8,7 @@ class Locker extends events.EventEmitter {
         this._heft = [{ max: heft }]
         this._group = 1
         this._version = 1
-        this._order = 0
+        this._order = 1
         this._completed = 0
         this._amalgamators = new Set
         this._rotating = false
@@ -32,7 +32,7 @@ class Locker extends events.EventEmitter {
         assert(this._groups[0].group == 1 && this._groups[0].heft == 0)
         for (const [ version, committed ] of versions) {
             const mutation = {
-                version, created: 0, completed: 0, rolledback: ! committed
+                version, completed: 0, rolledback: ! committed
             }
             this._groups[0].mutations.set(version, mutation)
             this._groups[0].max = Math.max(this._groups[0].max, version)
@@ -60,7 +60,6 @@ class Locker extends events.EventEmitter {
             // TODO Create is not used, but to remove it you should add
             // assertions to your unit test for Locker. Use variables instead of
             // constants to test `visible` and `conflicted`.
-            created: this._order++,
             order: 0,
             completed: Number.MAX_SAFE_INTEGER,
             rolledback: false
