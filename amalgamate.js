@@ -475,8 +475,7 @@ class Amalgamator {
         const skips = this._stages.map(stage => {
             const skip = mvcc.skip.strata(stage.strata, set, {
                 extractor: $ => [ extractor($) ],
-                filter: (sought, items, index) => {
-                    const key = items[index].key
+                filter: (sought, key) => {
                     return this._comparator.stage([ sought[0], key[1], key[2] ], key) == 0
                 }
             })
