@@ -458,24 +458,25 @@ class Amalgamator {
     }
 
     map (snapshot, set, { extractor = $ => $, additional = [] } = {}) {
-        const skip = mvcc.skip.strata(this.strata, set, { extractor })
+        const skip = mvcc.skip.strata(this.strata, set, { extractor: extractor })
         const primary = mvcc.twiddle(skip, items => {
-            return items.map(({ key, parts, value }) => {
+            return items.map(({ sought, parts, index }) => {
                 return {
-                    key: [ key, 0, 0 ],
+                    key: [ sought.key, 0, 0 ],
                     parts: [{
                         method: parts == null ? 'remove' : 'insert',
                         version: 0,
                         order: 0
                     }].concat(parts == null ? [] : parts),
-                    value
+                    sought: sought,
+                    index: index
                 }
             })
         })
         const skips = this._stages.map(stage => {
             const skip = mvcc.skip.strata(stage.strata, set, {
                 extractor: $ => [ extractor($) ],
-                filter: (sought, key) => {
+                group: (sought, key) => {
                     return this._comparator.stage([ sought[0], key[1], key[2] ], key) == 0
                 }
             })
@@ -483,7 +484,7 @@ class Amalgamator {
         }).concat(primary).concat(additional.map(array => {
             const skip = mvcc.skip.array(this._comparator.stage, array, set, {
                 extractor: $ => [ extractor($) ],
-                filter: (sought, items, index) => {
+                group: (sought, items, index) => {
                     const key = items[index].key
                     return this._comparator.stage([ sought[0], key[1], key[2] ], key) == 0
                 }
