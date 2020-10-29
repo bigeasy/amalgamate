@@ -1,4 +1,4 @@
-require('proof')(33, async okay => {
+require('proof')(35, async okay => {
     function dump (object) {
         console.log(require('util').inspect(object, { depth: null }))
     }
@@ -246,7 +246,45 @@ require('proof')(33, async okay => {
                 key: 'd', method: 'remove',
             }, {
                 key: 'e', method: 'insert',
-            }], 'set staged')
+            }], 'staged map')
+
+            iterator = amalgamator.map(snapshots[0], set.map(letter => Buffer.from(letter)), {
+                group: (sought, key, found) => Buffer.compare(sought, key) == 0,
+                additional: [[{
+                    key: [ Buffer.from('e'), Number.MAX_SAFE_INTEGER, 0 ],
+                    parts: [{
+                        method: 'insert',
+                        version: Math.MAX_SAFE_INTEGER,
+                        order: 0
+                    }, Buffer.from('e'), Buffer.from('E') ]
+                }]]
+            })
+
+            gather.length = 0
+            while (! iterator.done) {
+                iterator.next(trampoline, items => {
+                    for (const item of items) {
+                        gather.push({
+                            key: item.key[0].toString(),
+                            method: item.parts[0].method
+                        })
+                    }
+                })
+                while (trampoline.seek()) {
+                    await trampoline.shift()
+                }
+            }
+            okay(gather, [{
+                key: 'a', method: 'insert',
+            }, {
+                key: 'b', method: 'remove',
+            }, {
+                key: 'c', method: 'insert',
+            }, {
+                key: 'd', method: 'remove',
+            }, {
+                key: 'e', method: 'insert',
+            }], 'staged map with custom group')
 
             gather.length = 0
             amalgamator.get(snapshots[0], trampoline, Buffer.from('a'), item => {
@@ -462,9 +500,9 @@ require('proof')(33, async okay => {
                 }
             }
 
-            okay(gather, [ 'x', 'X', 'y', 'Y', 'z', 'Z' ], 'staged')
+            okay(gather, [ 'x', 'X', 'y', 'Y', 'z', 'Z' ], 'primary')
 
-            const set = amalgamator.map(snapshots[0], [ 'v', 'w', 'x', 'z' ].map(letter => Buffer.from(letter)), {
+            let set = amalgamator.map(snapshots[0], [ 'v', 'w', 'x', 'z' ].map(letter => Buffer.from(letter)), {
                 additional: [[{
                     key: [ Buffer.from('v'), Math.MAX_SAFE_INTEGER, 0 ],
                     parts: [{
@@ -497,7 +535,43 @@ require('proof')(33, async okay => {
                 key: 'x', method: 'insert',
             }, {
                 key: 'z', method: 'insert',
-            }], 'set staged')
+            }], 'map primary')
+
+            set = amalgamator.map(snapshots[0], [ 'v', 'w', 'x', 'z' ].map(letter => Buffer.from(letter)), {
+                group: (sought, key) => Buffer.compare(sought, key) == 0,
+                additional: [[{
+                    key: [ Buffer.from('v'), Math.MAX_SAFE_INTEGER, 0 ],
+                    parts: [{
+                        method: 'insert',
+                        version: Number.MAX_SAFE_INTEGER,
+                        order: 0
+                    }, Buffer.from('v'), Buffer.from('V') ]
+                }]]
+            })
+
+            gather.length = 0
+            while (! set.done) {
+                set.next(trampoline, items => {
+                    for (const item of items) {
+                        gather.push({
+                            key: item.key[0].toString(),
+                            method: item.parts[0].method
+                        })
+                    }
+                })
+                while (trampoline.seek()) {
+                    await trampoline.shift()
+                }
+            }
+            okay(gather, [{
+                key: 'v', method: 'remove',
+            }, {
+                key: 'w', method: 'remove',
+            }, {
+                key: 'x', method: 'insert',
+            }, {
+                key: 'z', method: 'insert',
+            }], 'map primary with custom group')
 
             gather.length = 0
             amalgamator.get(snapshots[0], trampoline, Buffer.from('x'), item => {
@@ -506,7 +580,7 @@ require('proof')(33, async okay => {
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            okay(gather, [ 'x', 'X' ], 'staged get')
+            okay(gather, [ 'x', 'X' ], 'primary get')
 
             const mutators = [ amalgamator.locker.mutator() ]
             okay(mutators[0].mutation.version, 6, 'version advanced')

@@ -457,8 +457,15 @@ class Amalgamator {
         this.locker.recover(recoveries)
     }
 
-    map (snapshot, set, { extractor = $ => $, additional = [] } = {}) {
-        const skip = mvcc.skip.strata(this.strata, set, { extractor: extractor })
+    map (snapshot, set, {
+        extractor = $ => $,
+        additional = [],
+        group = null
+    } = {}) {
+        const skip = mvcc.skip.strata(this.strata, set, {
+            extractor: extractor,
+            group: group ? group : (sought, key, found) => found
+        })
         const primary = mvcc.twiddle(skip, items => {
             return items.map(({ sought, parts, index }) => {
                 return {
@@ -476,7 +483,9 @@ class Amalgamator {
         const skips = this._stages.map(stage => {
             const skip = mvcc.skip.strata(stage.strata, set, {
                 extractor: $ => [ extractor($) ],
-                group: (sought, key) => {
+                group: group ? (sought, key) => {
+                    return group(sought[0], key[0], false)
+                } : (sought, key) => {
                     return this._comparator.stage([ sought[0], key[1], key[2] ], key) == 0
                 }
             })
