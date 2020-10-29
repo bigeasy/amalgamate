@@ -266,7 +266,8 @@ require('proof')(35, async okay => {
                     for (const item of items) {
                         gather.push({
                             key: item.key[0].toString(),
-                            method: item.parts[0].method
+                            method: item.parts[0].method,
+                            soughtIsBuffer: Buffer.isBuffer(item.sought.key)
                         })
                     }
                 })
@@ -275,15 +276,15 @@ require('proof')(35, async okay => {
                 }
             }
             okay(gather, [{
-                key: 'a', method: 'insert',
+                key: 'a', method: 'insert', soughtIsBuffer: true
             }, {
-                key: 'b', method: 'remove',
+                key: 'b', method: 'remove', soughtIsBuffer: true
             }, {
-                key: 'c', method: 'insert',
+                key: 'c', method: 'insert', soughtIsBuffer: true
             }, {
-                key: 'd', method: 'remove',
+                key: 'd', method: 'remove', soughtIsBuffer: true
             }, {
-                key: 'e', method: 'insert',
+                key: 'e', method: 'insert', soughtIsBuffer: true
             }], 'staged map with custom group')
 
             gather.length = 0
@@ -519,7 +520,8 @@ require('proof')(35, async okay => {
                     for (const item of items) {
                         gather.push({
                             key: item.key[0].toString(),
-                            method: item.parts[0].method
+                            method: item.parts[0].method,
+                            soughtIsBuffer: Buffer.isBuffer(item.sought.key)
                         })
                     }
                 })
@@ -528,13 +530,13 @@ require('proof')(35, async okay => {
                 }
             }
             okay(gather, [{
-                key: 'v', method: 'remove',
+                key: 'v', method: 'remove', soughtIsBuffer: true
             }, {
-                key: 'w', method: 'remove',
+                key: 'w', method: 'remove', soughtIsBuffer: true
             }, {
-                key: 'x', method: 'insert',
+                key: 'x', method: 'insert', soughtIsBuffer: true
             }, {
-                key: 'z', method: 'insert',
+                key: 'z', method: 'insert', soughtIsBuffer: true
             }], 'map primary')
 
             set = amalgamator.map(snapshots[0], [ 'v', 'w', 'x', 'z' ].map(letter => Buffer.from(letter)), {
@@ -555,7 +557,8 @@ require('proof')(35, async okay => {
                     for (const item of items) {
                         gather.push({
                             key: item.key[0].toString(),
-                            method: item.parts[0].method
+                            method: item.parts[0].method,
+                            soughtIsBuffer: Buffer.isBuffer(item.sought.key)
                         })
                     }
                 })
@@ -564,13 +567,13 @@ require('proof')(35, async okay => {
                 }
             }
             okay(gather, [{
-                key: 'v', method: 'remove',
+                key: 'v', method: 'remove', soughtIsBuffer: true
             }, {
-                key: 'w', method: 'remove',
+                key: 'w', method: 'remove', soughtIsBuffer: true
             }, {
-                key: 'x', method: 'insert',
+                key: 'x', method: 'insert', soughtIsBuffer: true
             }, {
-                key: 'z', method: 'insert',
+                key: 'z', method: 'insert', soughtIsBuffer: true
             }], 'map primary with custom group')
 
             gather.length = 0

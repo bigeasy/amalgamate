@@ -487,7 +487,10 @@ class Amalgamator {
                     return this.comparator.stage([ sought[0], key[1], key[2] ], key) == 0
                 }
             })
-            return mvcc.dilute(skip, item => item.parts == null ? 0 : 1)
+            return mvcc.dilute(skip, item => {
+                item.sought = { key: item.sought.key[0], value: item.sought.value }
+                return item.parts == null ? 0 : 1
+            })
         }).concat(primary).concat(additional.map(array => {
             const skip = mvcc.skip.array(this.comparator.stage, array, set, {
                 extractor: $ => [ extractor($) ],
@@ -496,7 +499,10 @@ class Amalgamator {
                     return this.comparator.stage([ sought[0], key[1], key[2] ], key) == 0
                 }
             })
-            return mvcc.dilute(skip, item => item.parts == null ? 0 : 1)
+            return mvcc.dilute(skip, item => {
+                item.sought = { key: item.sought.key[0], value: item.sought.value }
+                return item.parts == null ? 0 : 1
+            })
         }))
         const homogenize = mvcc.homogenize.forward(this.comparator.stage, skips)
         const visible = mvcc.dilute(homogenize, item => {
