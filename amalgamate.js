@@ -18,8 +18,6 @@ const ascension = require('ascension')
 
 const Interrupt = require('interrupt')
 
-const contains = require('./contains')
-
 // Strata b-tree iteration ultilities.
 const mvcc = {
     // Filter for the latest version of an MVCC record.
