@@ -104,7 +104,7 @@ class Amalgamator {
         //
         // TODO If we handle multple batches with the same version, someone
         // needs to maintain the index externally.
-        this._comparator = {
+        this.comparator = {
             primary: options.key.compare,
             stage: ascension([
                 options.key.compare, [ Number, -1 ], [ Number, -1 ]
@@ -222,8 +222,8 @@ class Amalgamator {
                         Number.MAX_SAFE_INTEGER
                     ]
                 },
-                leaf: this._comparator.stage,
-                branch: ascension([ this._comparator.primary ], object => [ object[0] ]),
+                leaf: this.comparator.stage,
+                branch: ascension([ this.comparator.primary ], object => [ object[0] ]),
             },
             ...this._strata.stage,
             cache: this._cache,
@@ -364,7 +364,7 @@ class Amalgamator {
             this.strata = new Strata(this._destructible.strata.durable('primary'), {
                 directory: path.join(directory, 'primary'),
                 cache: this._cache,
-                comparator: this._comparator.primary,
+                comparator: this.comparator.primary,
                 // TODO The shape of these options should be similar to that of
                 // Strata or Stata's option similar to the shape of these.
                 serializer: {
@@ -484,25 +484,25 @@ class Amalgamator {
                 group: group ? (sought, key) => {
                     return group(sought[0], key[0], false)
                 } : (sought, key) => {
-                    return this._comparator.stage([ sought[0], key[1], key[2] ], key) == 0
+                    return this.comparator.stage([ sought[0], key[1], key[2] ], key) == 0
                 }
             })
             return mvcc.dilute(skip, item => item.parts == null ? 0 : 1)
         }).concat(primary).concat(additional.map(array => {
-            const skip = mvcc.skip.array(this._comparator.stage, array, set, {
+            const skip = mvcc.skip.array(this.comparator.stage, array, set, {
                 extractor: $ => [ extractor($) ],
                 group: (sought, items, index) => {
                     const key = items[index].key
-                    return this._comparator.stage([ sought[0], key[1], key[2] ], key) == 0
+                    return this.comparator.stage([ sought[0], key[1], key[2] ], key) == 0
                 }
             })
             return mvcc.dilute(skip, item => item.parts == null ? 0 : 1)
         }))
-        const homogenize = mvcc.homogenize.forward(this._comparator.stage, skips)
+        const homogenize = mvcc.homogenize.forward(this.comparator.stage, skips)
         const visible = mvcc.dilute(homogenize, item => {
             return this.locker.visible(item.key[1], snapshot) ? 1 : 0
         })
-        return mvcc.designate.forward(this._comparator.primary, visible)
+        return mvcc.designate.forward(this.comparator.primary, visible)
     }
 
     iterator (snapshot, direction, key, inclusive, additional = []) {
@@ -541,11 +541,11 @@ class Amalgamator {
                 slice: 32, inclusive: inclusive
             })
         }).concat(primary).concat(additional)
-        const homogenize = mvcc.homogenize[direction](this._comparator.stage, riffles)
+        const homogenize = mvcc.homogenize[direction](this.comparator.stage, riffles)
         const visible = mvcc.dilute(homogenize, item => {
             return this.locker.visible(item.key[1], snapshot) ? 1 : 0
         })
-        const designate = mvcc.designate[direction](this._comparator.primary, visible)
+        const designate = mvcc.designate[direction](this.comparator.primary, visible)
         return mvcc.dilute(designate, item => item.parts[0].method == 'remove' ? 0 : 1)
     }
 
@@ -553,7 +553,7 @@ class Amalgamator {
         const candidates = [], stages = this._stages.slice()
         const get = () => {
             if (stages.length == 0) {
-                const winner = coalesce(candidates.sort(this._comparator.stage).pop(), {
+                const winner = coalesce(candidates.sort(this.comparator.stage).pop(), {
                     parts: [{ method: 'remove' }]
                 })
                 consume(winner.parts[0].method == 'remove' ? null : winner)
@@ -562,7 +562,7 @@ class Amalgamator {
                     let { index, page: { items } } = cursor
                     while (
                         index < items.length &&
-                        this._comparator.primary(items[index].key[0], key) == 0
+                        this.comparator.primary(items[index].key[0], key) == 0
                     ) {
                         if (this.locker.visible(items[index].key[1], snapshot)) {
                             candidates.push(items[index])
@@ -614,7 +614,7 @@ class Amalgamator {
         const visible = mvcc.dilute(riffle, item => {
             return this.locker.visible(item.key[1], mutator) ? 1 : 0
         })
-        const designate = mvcc.designate.forward(this._comparator.primary, visible)
+        const designate = mvcc.designate.forward(this.comparator.primary, visible)
         await mvcc.splice(item => {
             this._destructible.amalgamate.progress()
             return {
