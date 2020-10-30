@@ -1,3 +1,17 @@
+## Fri Oct 30 04:45:41 CDT 2020
+
+It is really tempting to say that Amalgamate will always have compound keys and
+a key that is not compound is a key of one element. This would be a penalty for
+locket which only ever has a `Buffer` as a key, and then the penalty would be
+incurred especially if the database was only ever read but would simplify things
+otherwise by using ascension and then using its partial comparison for the inner
+where records would always be stored as arrays. Searches would always be wrapped
+in an array, etc.
+
+In fact, it makes sense to do something like this partially for now since we
+have to always twiddle the results coming out of primary to use them to do our
+designation. We can just wrap the key in the search or get.
+
 ## Sat Sep 26 20:40:19 CDT 2020
 
 New shutdown problems. Same as before, but now with a new level of indirection.

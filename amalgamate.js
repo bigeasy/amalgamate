@@ -465,17 +465,14 @@ class Amalgamator {
             group: group ? group : (sought, key, found) => found
         })
         const primary = mvcc.twiddle(skip, items => {
-            return items.map(({ sought, parts, index }) => {
-                return {
-                    key: [ sought.key, 0, 0 ],
-                    parts: [{
-                        method: parts == null ? 'remove' : 'insert',
-                        version: 0,
-                        order: 0
-                    }].concat(parts == null ? [] : parts),
-                    sought: sought,
-                    index: index
-                }
+            return items.map(item => {
+                item.items = item.items.map(item => {
+                    return {
+                        key: [ item.key, 0, 0 ],
+                        parts: [{ method: 'insert', version: 0, order: 0 }].concat(item.parts)
+                    }
+                })
+                return item
             })
         })
         const skips = this._stages.map(stage => {
@@ -484,12 +481,14 @@ class Amalgamator {
                 group: group ? (sought, key) => {
                     return group(sought[0], key[0], false)
                 } : (sought, key) => {
-                    return this.comparator.stage([ sought[0], key[1], key[2] ], key) == 0
+                    return this.comparator.primary(sought[0], key[0]) == 0
                 }
             })
-            return mvcc.dilute(skip, item => {
-                item.sought = { key: item.sought.key[0], value: item.sought.value }
-                return item.parts == null ? 0 : 1
+            return mvcc.twiddle(skip, items => {
+                return items.map(item => {
+                    item.key = item.key[0]
+                    return item
+                })
             })
         }).concat(primary).concat(additional.map(array => {
             const skip = mvcc.skip.array(this.comparator.stage, array, set, {
@@ -499,16 +498,21 @@ class Amalgamator {
                     return this.comparator.stage([ sought[0], key[1], key[2] ], key) == 0
                 }
             })
-            return mvcc.dilute(skip, item => {
-                item.sought = { key: item.sought.key[0], value: item.sought.value }
-                return item.parts == null ? 0 : 1
+            return mvcc.twiddle(skip, items => {
+                return items.map(item => {
+                    item.key = item.key[0]
+                    return item
+                })
             })
         }))
-        const homogenize = mvcc.homogenize.forward(this.comparator.stage, skips)
-        const visible = mvcc.dilute(homogenize, item => {
-            return this.locker.visible(item.key[1], snapshot) ? 1 : 0
+        const homogenized = mvcc.homogenize.map(this.comparator.stage, skips)
+        const diluted = mvcc.twiddle(homogenized, items => {
+            return items.map(item => {
+                item.items = item.items.filter(item => this.locker.visible(item.key[1], snapshot))
+                return item
+            })
         })
-        return mvcc.designate.forward(this.comparator.primary, visible)
+        return mvcc.designate.map(this.comparator.primary, diluted)
     }
 
     iterator (snapshot, direction, key, inclusive, additional = []) {

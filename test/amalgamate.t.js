@@ -35,6 +35,8 @@ require('proof')(35, async okay => {
     const locker = new Locker({ heft: 1024 })
     await locker.rotate()
 
+    // TODO Why did I do this as buffers? Tests would be so much easier as
+    // strings.
     function createAmalgamator (options) {
         const destructible = new Destructible(10000, 'amalgamate.t')
         return new Amalgamator(destructible, {
@@ -225,11 +227,13 @@ require('proof')(35, async okay => {
             gather.length = 0
             while (! iterator.done) {
                 iterator.next(trampoline, items => {
-                    for (const item of items) {
-                        gather.push({
-                            key: item.key[0].toString(),
-                            method: item.parts[0].method
-                        })
+                    for (const outer of items) {
+                        for (const inner of outer.items) {
+                            gather.push({
+                                key: inner.key[0].toString(),
+                                method: inner.parts[0].method
+                            })
+                        }
                     }
                 })
                 while (trampoline.seek()) {
@@ -242,8 +246,6 @@ require('proof')(35, async okay => {
                 key: 'b', method: 'remove',
             }, {
                 key: 'c', method: 'insert',
-            }, {
-                key: 'd', method: 'remove',
             }, {
                 key: 'e', method: 'insert',
             }], 'staged map')
@@ -263,12 +265,14 @@ require('proof')(35, async okay => {
             gather.length = 0
             while (! iterator.done) {
                 iterator.next(trampoline, items => {
-                    for (const item of items) {
-                        gather.push({
-                            key: item.key[0].toString(),
-                            method: item.parts[0].method,
-                            soughtIsBuffer: Buffer.isBuffer(item.sought.key)
-                        })
+                    for (const outer of items) {
+                        for (const inner of outer.items) {
+                            gather.push({
+                                key: inner.key[0].toString(),
+                                method: inner.parts[0].method,
+                                soughtIsBuffer: Buffer.isBuffer(outer.key)
+                            })
+                        }
                     }
                 })
                 while (trampoline.seek()) {
@@ -281,8 +285,6 @@ require('proof')(35, async okay => {
                 key: 'b', method: 'remove', soughtIsBuffer: true
             }, {
                 key: 'c', method: 'insert', soughtIsBuffer: true
-            }, {
-                key: 'd', method: 'remove', soughtIsBuffer: true
             }, {
                 key: 'e', method: 'insert', soughtIsBuffer: true
             }], 'staged map with custom group')
@@ -505,7 +507,7 @@ require('proof')(35, async okay => {
 
             let set = amalgamator.map(snapshots[0], [ 'v', 'w', 'x', 'z' ].map(letter => Buffer.from(letter)), {
                 additional: [[{
-                    key: [ Buffer.from('v'), Math.MAX_SAFE_INTEGER, 0 ],
+                    key: [ Buffer.from('v'), Number.MAX_SAFE_INTEGER, 0 ],
                     parts: [{
                         method: 'insert',
                         version: Number.MAX_SAFE_INTEGER,
@@ -517,12 +519,14 @@ require('proof')(35, async okay => {
             gather.length = 0
             while (! set.done) {
                 set.next(trampoline, items => {
-                    for (const item of items) {
-                        gather.push({
-                            key: item.key[0].toString(),
-                            method: item.parts[0].method,
-                            soughtIsBuffer: Buffer.isBuffer(item.sought.key)
-                        })
+                    for (const outer of items) {
+                        for (const inner of outer.items) {
+                            gather.push({
+                                key: inner.key[0].toString(),
+                                method: inner.parts[0].method,
+                                soughtIsBuffer: Buffer.isBuffer(outer.key)
+                            })
+                        }
                     }
                 })
                 while (trampoline.seek()) {
@@ -530,9 +534,7 @@ require('proof')(35, async okay => {
                 }
             }
             okay(gather, [{
-                key: 'v', method: 'remove', soughtIsBuffer: true
-            }, {
-                key: 'w', method: 'remove', soughtIsBuffer: true
+                key: 'v', method: 'insert', soughtIsBuffer: true
             }, {
                 key: 'x', method: 'insert', soughtIsBuffer: true
             }, {
@@ -542,7 +544,7 @@ require('proof')(35, async okay => {
             set = amalgamator.map(snapshots[0], [ 'v', 'w', 'x', 'z' ].map(letter => Buffer.from(letter)), {
                 group: (sought, key) => Buffer.compare(sought, key) == 0,
                 additional: [[{
-                    key: [ Buffer.from('v'), Math.MAX_SAFE_INTEGER, 0 ],
+                    key: [ Buffer.from('v'), Number.MAX_SAFE_INTEGER, 0 ],
                     parts: [{
                         method: 'insert',
                         version: Number.MAX_SAFE_INTEGER,
@@ -554,12 +556,14 @@ require('proof')(35, async okay => {
             gather.length = 0
             while (! set.done) {
                 set.next(trampoline, items => {
-                    for (const item of items) {
-                        gather.push({
-                            key: item.key[0].toString(),
-                            method: item.parts[0].method,
-                            soughtIsBuffer: Buffer.isBuffer(item.sought.key)
-                        })
+                    for (const outer of items) {
+                        for (const inner of outer.items) {
+                            gather.push({
+                                key: inner.key[0].toString(),
+                                method: inner.parts[0].method,
+                                soughtIsBuffer: Buffer.isBuffer(outer.key)
+                            })
+                        }
                     }
                 })
                 while (trampoline.seek()) {
@@ -567,9 +571,7 @@ require('proof')(35, async okay => {
                 }
             }
             okay(gather, [{
-                key: 'v', method: 'remove', soughtIsBuffer: true
-            }, {
-                key: 'w', method: 'remove', soughtIsBuffer: true
+                key: 'v', method: 'insert', soughtIsBuffer: true
             }, {
                 key: 'x', method: 'insert', soughtIsBuffer: true
             }, {
@@ -578,6 +580,7 @@ require('proof')(35, async okay => {
 
             gather.length = 0
             amalgamator.get(snapshots[0], trampoline, Buffer.from('x'), item => {
+                console.log(item)
                 gather.push(item.parts[1].toString(), item.parts[2].toString())
             })
             while (trampoline.seek()) {
@@ -675,11 +678,14 @@ require('proof')(35, async okay => {
             gather.length = 0
             while (! iterator.done) {
                 iterator.next(trampoline, items => {
-                    for (const item of items) {
-                        gather.push({
-                            key: item.key[0].toString(),
-                            method: item.parts[0].method
-                        })
+                    for (const outer of items) {
+                        for (const inner of outer.items) {
+                            gather.push({
+                                key: inner.key[0].toString(),
+                                method: inner.parts[0].method,
+                                soughtIsBuffer: Buffer.isBuffer(outer.key)
+                            })
+                        }
                     }
                 })
                 while (trampoline.seek()) {
@@ -688,9 +694,7 @@ require('proof')(35, async okay => {
             }
 
             okay(gather, [{
-                key: 'a', method: 'insert'
-            }, {
-                key: 'd', method: 'remove'
+                key: 'a', method: 'insert', soughtIsBuffer: true
             }], 'rollback set')
 
             amalgamator.locker.release(snapshots.shift())

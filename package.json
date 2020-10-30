@@ -23,7 +23,7 @@
     "dependencies":
     {
                             "b-tree":                       "2.0.0-alpha.63",
-                            "designate":                    "2.0.0-alpha.9",
+                            "designate":                    "2.0.0-alpha.10",
                             "dilute":                       "2.0.0-alpha.5",
                             "extant":                       "^1.0.20",
                             "homogenize":                   "2.0.0-alpha.10",
