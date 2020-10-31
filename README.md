@@ -4,15 +4,15 @@
 
 An ordered, durable MVCC data store.
 
-| What          | Where                                            |
+| What          | Where                                             |
 | --- | --- |
-| Discussion    | https://github.com/bigeasy/amalgamate/issues/1   |
-| Documentation | https://bigeasy.github.io/amalgamate             |
-| Source        | https://github.com/bigeasy/amalgamate            |
-| Issues        | https://github.com/bigeasy/amalgamate/issues     |
-| CI            | https://travis-ci.org/bigeasy/amalgamate         |
-| Coverage:     | https://codecov.io/gh/bigeasy/amalgamate         |
-| License:      | MIT                                              |
+| Discussion    | https://github.com/bigeasy/amalgamate/issues/1    |
+| Documentation | https://bigeasy.github.io/amalgamate              |
+| Source        | https://github.com/bigeasy/amalgamate             |
+| Issues        | https://github.com/bigeasy/amalgamate/issues      |
+| CI            | https://travis-ci.org/bigeasy/amalgamate          |
+| Coverage:     | https://codecov.io/gh/bigeasy/amalgamate          |
+| License:      | MIT                                               |
 
 
 ```
