@@ -403,7 +403,7 @@ class Amalgamator {
         assert(~this._stages[0].groups.indexOf(1))
         const recoveries = new Map, counts = {}, trampoline = new Trampoline
         for (const stage of this._stages.slice(1)) {
-            const iterator = mvcc.riffle.forward(stage.strata, Strata.MIN)
+            const iterator = mvcc.riffle(stage.strata, Strata.MIN)
             while (! iterator.done) {
                 iterator.next(trampoline, items => {
                     for (const item of items) {
@@ -438,7 +438,7 @@ class Amalgamator {
         assert(~this._stages[0].groups.indexOf(1))
         const recoveries = new Map, trampoline = new Trampoline
         for (const stage of this._stages.slice(1)) {
-            const iterator = mvcc.riffle.forward(stage.strata, Strata.MIN)
+            const iterator = mvcc.riffle(stage.strata, Strata.MIN)
             while (! iterator.done) {
                 iterator.next(trampoline, items => {
                     for (const item of items) {
@@ -505,14 +505,14 @@ class Amalgamator {
                 })
             })
         }))
-        const homogenized = mvcc.homogenize.map(this.comparator.stage, skips)
+        const homogenized = mvcc.homogenize(this.comparator.stage, skips)
         const diluted = mvcc.twiddle(homogenized, items => {
             return items.map(item => {
                 item.items = item.items.filter(item => this.locker.visible(item.key[1], snapshot))
                 return item
             })
         })
-        return mvcc.designate.map(this.comparator.primary, diluted)
+        return mvcc.designate(this.comparator.primary, diluted)
     }
 
     iterator (snapshot, direction, key, inclusive, additional = []) {
@@ -532,8 +532,9 @@ class Amalgamator {
                 ? Strata.MIN
                 : Strata.MAX
         const uncompound = typeof versioned == 'symbol' ? versioned : versioned[0]
+        const reverse = direction == 'reverse'
 
-        const riffle = mvcc.riffle[direction](this.strata, uncompound, { slice: 32, inclusive })
+        const riffle = mvcc.riffle(this.strata, uncompound, { slice: 32, inclusive, reverse })
 
         const primary = mvcc.twiddle(riffle, items => {
             return items.map(item => {
@@ -547,15 +548,13 @@ class Amalgamator {
         })
 
         const riffles = this._stages.map(stage => {
-            return mvcc.riffle[direction](stage.strata, versioned, {
-                slice: 32, inclusive: inclusive
-            })
+            return mvcc.riffle(stage.strata, versioned, { slice: 32, inclusive, reverse })
         }).concat(primary).concat(additional)
-        const homogenize = mvcc.homogenize[direction](this.comparator.stage, riffles)
+        const homogenize = mvcc.homogenize(this.comparator.stage, riffles)
         const visible = mvcc.dilute(homogenize, item => {
             return this.locker.visible(item.key[1], snapshot) ? 1 : 0
         })
-        const designate = mvcc.designate[direction](this.comparator.primary, visible)
+        const designate = mvcc.designate(this.comparator.primary, visible)
         return mvcc.dilute(designate, item => item.parts[0].method == 'remove' ? 0 : 1)
     }
 
@@ -620,11 +619,11 @@ class Amalgamator {
     }
 
     async _amalgamate (mutator, stage) {
-        const riffle = mvcc.riffle.forward(stage.strata, Strata.MIN)
+        const riffle = mvcc.riffle(stage.strata, Strata.MIN)
         const visible = mvcc.dilute(riffle, item => {
             return this.locker.visible(item.key[1], mutator) ? 1 : 0
         })
-        const designate = mvcc.designate.forward(this.comparator.primary, visible)
+        const designate = mvcc.designate(this.comparator.primary, visible)
         await mvcc.splice(item => {
             this._destructible.amalgamate.progress()
             return {

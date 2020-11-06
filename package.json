@@ -22,18 +22,18 @@
     },
     "dependencies":
     {
-                            "b-tree":                       "2.0.0-alpha.63",
-                            "designate":                    "2.0.0-alpha.10",
-                            "dilute":                       "2.0.0-alpha.5",
+                            "b-tree":                       "2.0.0-alpha.64",
+                            "designate":                    "2.0.0-alpha.12",
+                            "dilute":                       "2.0.0-alpha.6",
                             "extant":                       "^1.0.20",
-                            "homogenize":                   "2.0.0-alpha.11",
+                            "homogenize":                   "2.0.0-alpha.12",
                             "interrupt":                    "11.0.0-alpha.1",
-                            "reciprocate":                  "0.0.1",
+                            "reciprocate":                  "0.0.2",
                             "rescue":                       "7.0.0-alpha.1",
-                            "riffle":                       "2.0.0-alpha.40",
-                            "skip":                         "0.2.7",
-                            "splice":                       "3.0.0-alpha.27",
-                            "twiddle":                      "2.0.0-alpha.6"
+                            "riffle":                       "2.0.0-alpha.43",
+                            "skip":                         "0.2.9",
+                            "splice":                       "3.0.0-alpha.29",
+                            "twiddle":                      "2.0.0-alpha.7"
     },
     "devDependencies":
     {
