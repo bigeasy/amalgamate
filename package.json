@@ -22,7 +22,7 @@
     },
     "dependencies":
     {
-                            "b-tree":                       "2.0.0-alpha.64",
+                            "b-tree":                       "2.0.0-alpha.65",
                             "designate":                    "2.0.0-alpha.12",
                             "dilute":                       "2.0.0-alpha.6",
                             "extant":                       "^1.0.20",

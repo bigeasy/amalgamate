@@ -209,9 +209,9 @@ class Amalgamator {
 
     // Create a new staging tree. The caller will determine if the tree should
     // be opened or created.
-    _newStage (directory, group) {
+    async _newStage (directory, group, create) {
         const header = this._header
-        const strata = new Strata(this._destructible.strata.ephemeral([ 'stage', directory ]), {
+        const strata = await Strata.open(this._destructible.strata.ephemeral([ 'stage', directory ]), {
             directory: directory,
             comparator: {
                 zero: object => {
@@ -314,7 +314,8 @@ class Amalgamator {
                     ]
                 }
                 return [ parts[1], parts[0].version, parts[0].order ]
-            }
+            },
+            create: create
         })
         return { groups: [ group ], strata, path: directory, count: 0 }
     }
@@ -361,7 +362,7 @@ class Amalgamator {
             }
             // TODO Either use destructible correctly or bring it internal to
             // Strata.
-            this.strata = new Strata(this._destructible.strata.durable('primary'), {
+            this.strata = await Strata.open(this._destructible.strata.durable('primary'), {
                 directory: path.join(directory, 'primary'),
                 cache: this._cache,
                 comparator: this.comparator.primary,
@@ -376,23 +377,17 @@ class Amalgamator {
                 },
                 branch: this._strata.primary.branch,
                 leaf: this._strata.primary.leaf,
-                extractor: this.extractor
+                extractor: this.extractor,
+                create: (await fs.readdir(path.join(directory, 'primary'))).length == 0
             })
-            if ((await fs.readdir(path.join(directory, 'primary'))).length != 0) {
-                await this.strata.open()
-            } else {
-                await this.strata.create()
-            }
             const staging = path.join(directory, 'staging')
             for (const file of await fs.readdir(staging)) {
-                const stage = this._newStage(path.join(staging, file), 0)
-                await stage.strata.open()
+                const stage = await this._newStage(path.join(staging, file), 0, false)
                 this._stages.unshift(stage)
             }
             const latest = path.join(staging, this._filestamp())
             await fs.mkdir(latest, { recursive: true })
-            const stage = this._newStage(latest, this.locker.register(this))
-            await stage.strata.create()
+            const stage = await this._newStage(latest, this.locker.register(this), true)
             this._stages.unshift(stage)
         } finally {
             this._ready.call()
@@ -610,8 +605,7 @@ class Amalgamator {
             this._destructible.amalgamate.ephemeral('rotate', async () => {
                 const directory = path.join(this.directory, 'staging', this._filestamp())
                 await fs.mkdir(directory, { recursive: true })
-                const next = this._newStage(directory, group)
-                await next.strata.create()
+                const next = await this._newStage(directory, group, true)
                 this._stages.unshift(next)
                 this.locker.rotated(this)
             })
