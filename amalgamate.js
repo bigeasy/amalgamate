@@ -62,37 +62,7 @@ class Amalgamator {
         ALREADY_EXISTS: 'attempted to create a database where one already exists'
     })
 
-    // Options.
-    //
-    //  * `transformer` — transform an application operation into an
-    //  `Amalgamator` operation with a `method` of `"insert"` or `"remove"`, a
-    //  `key` and a `value`.
-    //  * `header.compose` — compose a staging tree header record for each
-    //  versioned record to accommodate a version counting strategy. TODO More
-    //  Docco.
-    //  * `header.serialize` — serialize the staging tree header record.
-    //  * `header.deserialize` — deserialize the staging tree header record.
-    //  * `stage.max` — max size of a staging tree before it is spliced into the
-    //  primary tree.
-    //  * `stage.leaf.split` — staging tree leaf page record count greater than
-    //  which will cause a leaf page to split.
-    //  * `stage.leaf.merge` — staging tree leaf page record count less than
-    //  which will cause a leaf page to merge with a neighbor.
-    //  * `stage.leaf.split` — staging tree branch page record count greater
-    //  than which will cause a branch page to split.
-    //  * `stage.leaf.merge` — staging tree leaf page record count less than
-    //  which will cause a leaf page to merge with a neighbor.
-    //  * `primary.leaf.split` — primary tree leaf page record count greater
-    //  than which will cause a leaf page to split.
-    //  * `primary.leaf.merge` — primary tree leaf page record count less than
-    //  which will cause a leaf page to merge with a neighbor.
-    //  * `primary.leaf.split` — primary tree branch page record count greater
-    //  than which will cause a branch page to split.
-    //  * `primary.leaf.merge` — primary tree leaf page record count less than
-    //  which will cause a leaf page to merge with a neighbor.
-
-    //
-    constructor (destructible, options) {
+    constructor (destructible, options, resolve) {
         this.destructible = destructible
         // Directory in which the data for this index is stored.
         this.directory = options.directory
@@ -151,8 +121,6 @@ class Amalgamator {
         this._header = options.header
         // External rotation, amalgamation and unstaging.
         this.locker = options.locker
-        // True when opening has completed.
-        this.ready = new Promise(resolve => this._ready = resolve)
         // Extract a key from the record.
         this.extractor = options.key.extract
         // Number of records in a staging tree after which the tree is merged
@@ -198,7 +166,44 @@ class Amalgamator {
                 this._cache.purge(0)
             })
         })
-        this._destructible.amalgamate.ephemeral('open', this._open(options))
+        this._destructible.amalgamate.ephemeral('open', this._open(options, resolve))
+    }
+
+    // Options.
+    //
+    //  * `transformer` — transform an application operation into an
+    //  `Amalgamator` operation with a `method` of `"insert"` or `"remove"`, a
+    //  `key` and a `value`.
+    //  * `header.compose` — compose a staging tree header record for each
+    //  versioned record to accommodate a version counting strategy. TODO More
+    //  Docco.
+    //  * `header.serialize` — serialize the staging tree header record.
+    //  * `header.deserialize` — deserialize the staging tree header record.
+    //  * `stage.max` — max size of a staging tree before it is spliced into the
+    //  primary tree.
+    //  * `stage.leaf.split` — staging tree leaf page record count greater than
+    //  which will cause a leaf page to split.
+    //  * `stage.leaf.merge` — staging tree leaf page record count less than
+    //  which will cause a leaf page to merge with a neighbor.
+    //  * `stage.leaf.split` — staging tree branch page record count greater
+    //  than which will cause a branch page to split.
+    //  * `stage.leaf.merge` — staging tree leaf page record count less than
+    //  which will cause a leaf page to merge with a neighbor.
+    //  * `primary.leaf.split` — primary tree leaf page record count greater
+    //  than which will cause a leaf page to split.
+    //  * `primary.leaf.merge` — primary tree leaf page record count less than
+    //  which will cause a leaf page to merge with a neighbor.
+    //  * `primary.leaf.split` — primary tree branch page record count greater
+    //  than which will cause a branch page to split.
+    //  * `primary.leaf.merge` — primary tree leaf page record count less than
+    //  which will cause a leaf page to merge with a neighbor.
+
+    //
+    static open (destructible, options) {
+        const latch = { promise: null, resolve: null }
+        latch.promise = new Promise(resolve => latch.resolve = resolve)
+        const amalgamate = new Amalgamator(destructible, options, latch.resolve)
+        return latch.promise
     }
 
     // Generate a relatively unique filename for a staging file, hopefully we
@@ -320,7 +325,7 @@ class Amalgamator {
         return { groups: [ group ], strata, path: directory, count: 0 }
     }
 
-    async _open (options) {
+    async _open (options, resolve) {
         try {
             const directory = this.directory
             const createIfMissing = coalesce(options.createIfMissing, true)
@@ -390,7 +395,7 @@ class Amalgamator {
             const stage = await this._newStage(latest, this.locker.register(this), true)
             this._stages.unshift(stage)
         } finally {
-            this._ready.call()
+            resolve(this)
         }
     }
 

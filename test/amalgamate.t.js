@@ -39,7 +39,7 @@ require('proof')(35, async okay => {
     // strings.
     function createAmalgamator (options) {
         const destructible = new Destructible(10000, 'amalgamate.t')
-        return new Amalgamator(destructible, {
+        return Amalgamator.open(destructible, {
             directory: directory,
             locker: new Locker({ heft: 1024 * 8 }),
             cache: new Cache,
@@ -83,7 +83,8 @@ require('proof')(35, async okay => {
 
     {
         try {
-            await createAmalgamator({ directory: __dirname }).destructible.rejected
+            const amalgamator = await createAmalgamator({ directory: __dirname })
+            await amalgamator.destructible.rejected
         } catch (error) {
             rescue(error, [ Amalgamator.Error, { code: 'NOT_A_DATABASE' } ])
             okay('not an appropriate directory')
@@ -92,7 +93,8 @@ require('proof')(35, async okay => {
 
     {
         try {
-            await createAmalgamator({ createIfMissing: false }).destructible.rejected
+            const amalgamator = await createAmalgamator({ createIfMissing: false })
+            await amalgamator.destructible.rejected
         } catch (error) {
             rescue(error, [ Amalgamator.Error, { code: 'DOES_NOT_EXIST' } ])
             okay('does not exist')
@@ -100,9 +102,7 @@ require('proof')(35, async okay => {
     }
 
     {
-        const amalgamator = createAmalgamator()
-
-        await amalgamator.ready
+        const amalgamator = await createAmalgamator()
 
         await Destructible.rescue(async function () {
             const snapshots = [ amalgamator.locker.snapshot() ]
@@ -364,7 +364,8 @@ require('proof')(35, async okay => {
 
     {
         try {
-            await createAmalgamator({ errorIfExists: true }).destructible.rejected
+            const amalgamator = await createAmalgamator({ errorIfExists: true })
+            await amalgamator.destructible.rejected
         } catch (error) {
             rescue(error, [ Amalgamator.Error, { code: 'ALREADY_EXISTS' } ])
             okay('error if exists')
@@ -372,12 +373,10 @@ require('proof')(35, async okay => {
     }
 
     {
-        const amalgamator = createAmalgamator()
+        const amalgamator = await createAmalgamator()
 
         await Destructible.rescue(async function () {
             const gather = []
-
-            await amalgamator.ready
 
             await amalgamator.count()
 
@@ -466,7 +465,7 @@ require('proof')(35, async okay => {
     }
 
     {
-        const amalgamator = createAmalgamator({
+        const amalgamator = await createAmalgamator({
             stage: {
                 leaf: { split: 16, merge: 16 },
                 branch: { split: 16, merge: 16 }
@@ -475,8 +474,6 @@ require('proof')(35, async okay => {
 
         await Destructible.rescue(async function () {
             const gather = []
-
-            await amalgamator.ready
 
             await amalgamator.count()
 
@@ -605,12 +602,10 @@ require('proof')(35, async okay => {
     }
 
     {
-        const amalgamator = createAmalgamator({ conflictable: false })
+        const amalgamator = await createAmalgamator({ conflictable: false })
 
         await Destructible.rescue(async function () {
             const gather = []
-
-            await amalgamator.ready
 
             const versions = new Set
             versions.add(6)
