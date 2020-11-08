@@ -1,3 +1,10 @@
+## Sat Nov  7 06:08:12 CST 2020
+
+Increasingly tempting to require compound keys. Running into it again. Would
+like some way to insist on compound keys and a way of specifying a partial
+compare. Compound keys are only required for records that go through designate,
+though, and then you have the problem of nesting the partialiaty.
+
 ## Fri Oct 30 04:45:41 CDT 2020
 
 It is really tempting to say that Amalgamate will always have compound keys and
