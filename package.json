@@ -22,6 +22,7 @@
     },
     "dependencies":
     {
+                            "ascension":                    "3.0.0-alpha.0",
                             "b-tree":                       "2.0.0-alpha.65",
                             "designate":                    "2.0.0-alpha.12",
                             "dilute":                       "2.0.0-alpha.6",
@@ -33,7 +34,8 @@
                             "riffle":                       "2.0.0-alpha.43",
                             "skip":                         "0.2.9",
                             "splice":                       "3.0.0-alpha.29",
-                            "twiddle":                      "2.0.0-alpha.7"
+                            "twiddle":                      "2.0.0-alpha.7",
+                            "whittle":                      "0.0.0"
     },
     "devDependencies":
     {

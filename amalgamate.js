@@ -16,7 +16,7 @@ const Trampoline = require('reciprocate')
 // Sort function generator.
 const ascension = require('ascension')
 // Extract the sorted field from an object.
-const whittle = require('./whittle')
+const whittle = require('whittle')
 
 const Interrupt = require('interrupt')
 
@@ -78,10 +78,7 @@ class Amalgamator {
         // needs to maintain the index externally.
         const _stage = ascension([
             options.key.compare, [ Number, -1 ], [ Number, -1 ]
-        ], function (object) {
-            assert(Array.isArray(object))
-            return object
-        })
+        ])
         this.comparator = {
             primary: options.key.compare,
             stage: _stage,
@@ -235,7 +232,7 @@ class Amalgamator {
                     ]
                 },
                 leaf: this.comparator.stage,
-                branch: ascension([ this.comparator.primary ], object => [ object[0] ]),
+                branch: whittle(ascension([ this.comparator.primary ]), object => [ object[0] ]),
             },
             ...this._strata.stage,
             cache: this._cache,
