@@ -1,4 +1,4 @@
-require('proof')(35, async okay => {
+require('proof')(36, async okay => {
     function dump (object) {
         console.log(require('util').inspect(object, { depth: null }))
     }
@@ -443,6 +443,14 @@ require('proof')(35, async okay => {
             snapshots.push(amalgamator.locker.snapshot())
 
             gather.length = 0
+            amalgamator.get(snapshots[0], trampoline, Buffer.from('n'), item => {
+                gather.push(item)
+            })
+            while (trampoline.seek()) {
+                await trampoline.shift()
+            }
+            okay(gather, [ null ], 'amalgamated get primary and staging merge')
+            gather.length = 0
 
             iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
             while (! iterator.done) {
@@ -577,7 +585,6 @@ require('proof')(35, async okay => {
 
             gather.length = 0
             amalgamator.get(snapshots[0], trampoline, Buffer.from('x'), item => {
-                console.log(item)
                 gather.push(item.parts[1].toString(), item.parts[2].toString())
             })
             while (trampoline.seek()) {

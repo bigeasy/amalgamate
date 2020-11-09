@@ -15,6 +15,8 @@ const Trampoline = require('reciprocate')
 
 // Sort function generator.
 const ascension = require('ascension')
+// Extract the sorted field from an object.
+const whittle = require('./whittle')
 
 const Interrupt = require('interrupt')
 
@@ -74,14 +76,19 @@ class Amalgamator {
         //
         // TODO If we handle multple batches with the same version, someone
         // needs to maintain the index externally.
+        const _stage = ascension([
+            options.key.compare, [ Number, -1 ], [ Number, -1 ]
+        ], function (object) {
+            assert(Array.isArray(object))
+            return object
+        })
         this.comparator = {
             primary: options.key.compare,
-            stage: ascension([
-                options.key.compare, [ Number, -1 ], [ Number, -1 ]
-            ], function (object) {
-                assert(Array.isArray(object))
-                return object
-            })
+            stage: _stage,
+            _stage: {
+                key: _stage,
+                item: whittle(_stage, item => item.key)
+            }
         }
         // Transforms an application operation into an `Amalgamator` operation.
         this._transformer = options.transformer
@@ -562,7 +569,7 @@ class Amalgamator {
         const candidates = [], stages = this._stages.slice()
         const get = () => {
             if (stages.length == 0) {
-                const winner = coalesce(candidates.sort(this.comparator.stage).pop(), {
+                const winner = coalesce(candidates.sort(this.comparator._stage.item)[0], {
                     parts: [{ method: 'remove' }]
                 })
                 consume(winner.parts[0].method == 'remove' ? null : winner)
