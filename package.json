@@ -24,7 +24,7 @@
     {
                             "ascension":                    "3.0.0-alpha.0",
                             "b-tree":                       "2.0.0-alpha.66",
-                            "designate":                    "2.0.0-alpha.12",
+                            "designate":                    "2.0.0-alpha.13",
                             "dilute":                       "2.0.0-alpha.6",
                             "extant":                       "^1.0.20",
                             "homogenize":                   "2.0.0-alpha.13",
