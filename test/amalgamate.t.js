@@ -86,6 +86,7 @@ require('proof')(36, async okay => {
             const amalgamator = await createAmalgamator({ directory: __dirname })
             await amalgamator.destructible.rejected
         } catch (error) {
+            debugger
             rescue(error, [ Amalgamator.Error, { code: 'NOT_A_DATABASE' } ])
             okay('not an appropriate directory')
         }
