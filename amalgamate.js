@@ -61,11 +61,17 @@ class Amalgamator {
     static Error = Interrupt.create('Amalgamator.Error', {
         DOES_NOT_EXIST: 'database does not exist',
         NOT_A_DATABASE: 'database directory does not contain a database',
-        ALREADY_EXISTS: 'attempted to create a database where one already exists'
+        ALREADY_EXISTS: 'attempted to create a database where one already exists',
+        NOT_SAME_STAGE: 'destructible and destructible of turnstile must be in the same shutdown stage'
     })
 
-    constructor (destructible, options, resolve) {
+    constructor (destructible, options) {
         this.destructible = destructible
+        this._destructible = {
+            strata: destructible.durable($ => $(), 'amalgamate'),
+            amalgamate: destructible.durable($ => $(), 'amalgamate'),
+            unstage: destructible.durable($ => $(), 'unstage')
+        }
         // Directory in which the data for this index is stored.
         this.directory = options.directory
         // Whether or not this Amalgamator should check for conflicts.
@@ -107,12 +113,9 @@ class Amalgamator {
         // traversal of a linked list of never more than a half-dozen elements.
         //
         this.destructible = destructible
-        this._destructible = {
-            amalgamate: destructible.durable('amalgamate'),
-            unstage: destructible.durable('unstage'),
-            strata: destructible.durable('strata')
-        }
-        this._destructible.strata.increment()
+        Amalgamator.Error.assert(this.destructible.isSameStage(options.turnstile.destructible), 'NOT_SAME_STAGE')
+        this._turnstile = options.turnstile
+        this._turnstile.countdown.increment()
         // Ensure only one rotate at a time.
         this._rotating = false
         // The Strata b-tree cache to use to store pages.
@@ -163,14 +166,13 @@ class Amalgamator {
             this._open = false
             destructible.ephemeral('shutdown', async () => {
                 await this._destructible.amalgamate.destroy().destructed
-                this._destructible.strata.decrement()
-                await this._destructible.strata.destructed
+                this._turnstile.countdown.decrement()
+                await this._turnstile.destructible.destructed
                 this.locker.unregister(this)
-                // TODO Heh. No!
+                // **TODO** Heh. No! (BIG DEAL FIX THIS.)
                 this._cache.purge(0)
             })
         })
-        this._destructible.amalgamate.ephemeral('open', this._open(options, resolve))
     }
 
     // Options.
@@ -204,10 +206,7 @@ class Amalgamator {
 
     //
     static open (destructible, options) {
-        const latch = { promise: null, resolve: null }
-        latch.promise = new Promise(resolve => latch.resolve = resolve)
-        const amalgamate = new Amalgamator(destructible, options, latch.resolve)
-        return latch.promise
+        return new Amalgamator(destructible, options)._open(options)
     }
 
     // Generate a relatively unique filename for a staging file, hopefully we
@@ -216,12 +215,15 @@ class Amalgamator {
         return String(Date.now())
     }
 
+    static _INSTANCE = 0
+
     // Create a new staging tree. The caller will determine if the tree should
     // be opened or created.
     async _newStage (directory, group, create) {
         const header = this._header
-        const strata = await Strata.open(this._destructible.strata.ephemeral([ 'stage', directory ]), {
+        const strata = await Strata.open(this._destructible.strata.ephemeral($ => $(), [ 'stage', directory ]), {
             directory: directory,
+            turnstile: this._turnstile,
             comparator: {
                 zero: object => {
                     assert(Array.isArray(object))
@@ -235,7 +237,7 @@ class Amalgamator {
                 branch: whittle(ascension([ this.comparator.primary ]), object => [ object[0] ]),
             },
             ...this._strata.stage,
-            cache: this._cache,
+            cache: this._cache.magazine([ 'stage', directory, Amalgamator._INSTANCE++ ]),
             // Meta information is used for merge and that is the thing we're
             // calling a header. The key's in branches will not need meta
             // information so we'll be able to serialize it without any
@@ -329,8 +331,9 @@ class Amalgamator {
         return { groups: [ group ], strata, path: directory, count: 0 }
     }
 
-    async _open (options, resolve) {
-        try {
+    // **TODO** You can probably do all this directly in static `open`.
+
+    async _open (options) {
             const directory = this.directory
             const createIfMissing = coalesce(options.createIfMissing, true)
             const errorIfExists = coalesce(options.errorIfExists, false)
@@ -344,6 +347,7 @@ class Amalgamator {
                     try {
                         return await fs.readdir(directory)
                     } catch (error) {
+                        console.log(error.stack)
                         await rescue(error, [{ code: 'ENOENT' }])
                         if (!createIfMissing) {
                             throw new Amalgamator.Error('DOES_NOT_EXIST', { directory })
@@ -352,6 +356,7 @@ class Amalgamator {
                     }
                 }
             }) ()
+            console.log(files)
             const subdirs = [ 'primary', 'staging' ]
             const sorted = files.filter(file => file[0] != '.').sort()
             if (!sorted.length) {
@@ -371,9 +376,11 @@ class Amalgamator {
             }
             // TODO Either use destructible correctly or bring it internal to
             // Strata.
-            this.strata = await Strata.open(this._destructible.strata.durable('primary'), {
+        return this._destructible.amalgamate.exceptional($ => $(), 'open', async () => {
+            this.strata = await Strata.open(this._destructible.strata.durable($ => $(), 'primary'), {
                 directory: path.join(directory, 'primary'),
-                cache: this._cache,
+                turnstile: this._turnstile,
+                cache: this._cache.magazine([ 'primary', Amalgamator._INSTANCE++ ]),
                 comparator: this.comparator.primary,
                 // TODO The shape of these options should be similar to that of
                 // Strata or Stata's option similar to the shape of these.
@@ -398,9 +405,8 @@ class Amalgamator {
             await fs.mkdir(latest, { recursive: true })
             const stage = await this._newStage(latest, this.locker.register(this), true)
             this._stages.unshift(stage)
-        } finally {
-            resolve(this)
-        }
+            return this
+        })
     }
 
     async count () {

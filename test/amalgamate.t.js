@@ -11,11 +11,12 @@ require('proof')(36, async okay => {
     const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
     const Amalgamator = require('..')
+    const Turnstile = require('turnstile')
     const Locker = require('../locker')
 
     const rescue = require('rescue')
 
-    const Cache = require('b-tree/cache')
+    const Cache = require('magazine')
 
     const directory = path.join(__dirname, 'tmp', 'amalgamate')
 
@@ -37,10 +38,11 @@ require('proof')(36, async okay => {
 
     // TODO Why did I do this as buffers? Tests would be so much easier as
     // strings.
-    function createAmalgamator (options) {
-        const destructible = new Destructible(10000, 'amalgamate.t')
+    function createAmalgamator (destructible, options) {
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         return Amalgamator.open(destructible, {
             directory: directory,
+            turnstile: turnstile,
             locker: new Locker({ heft: 1024 * 8 }),
             cache: new Cache,
             comparator: Buffer.compare,
@@ -83,10 +85,11 @@ require('proof')(36, async okay => {
 
     {
         try {
-            const amalgamator = await createAmalgamator({ directory: __dirname })
-            await amalgamator.destructible.rejected
+            const destructible = new Destructible($ => $(), 'amagamate.t')
+            const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), { directory: __dirname })
+            console.log('here')
+            await destructible.rejected
         } catch (error) {
-            debugger
             rescue(error, [ Amalgamator.Error, { code: 'NOT_A_DATABASE' } ])
             okay('not an appropriate directory')
         }
@@ -94,8 +97,10 @@ require('proof')(36, async okay => {
 
     {
         try {
-            const amalgamator = await createAmalgamator({ createIfMissing: false })
-            await amalgamator.destructible.rejected
+            await fs.rmdir(directory, { recursive: true })
+            const destructible = new Destructible($ => $(), 'amagamate.t')
+            const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), { createIfMissing: false })
+            await destructible.rejected
         } catch (error) {
             rescue(error, [ Amalgamator.Error, { code: 'DOES_NOT_EXIST' } ])
             okay('does not exist')
@@ -103,9 +108,10 @@ require('proof')(36, async okay => {
     }
 
     {
-        const amalgamator = await createAmalgamator()
+        const destructible = new Destructible($ => $(), 'amagamate.t')
+        const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'))
 
-        await Destructible.rescue(async function () {
+        destructible.rescue($ => $(), 'test', async () => {
             const snapshots = [ amalgamator.locker.snapshot() ]
             let iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
 
@@ -358,14 +364,16 @@ require('proof')(36, async okay => {
             ], 'amalgamate many')
 
             // TODO Reverse iterator.
+            destructible.destroy()
         })
 
-        await amalgamator.destructible.destroy().rejected
+        await destructible.rejected
     }
 
     {
         try {
-            const amalgamator = await createAmalgamator({ errorIfExists: true })
+            const destructible = new Destructible($ => $(), 'amagamate.t')
+            const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), { errorIfExists: true })
             await amalgamator.destructible.rejected
         } catch (error) {
             rescue(error, [ Amalgamator.Error, { code: 'ALREADY_EXISTS' } ])
@@ -374,9 +382,10 @@ require('proof')(36, async okay => {
     }
 
     {
-        const amalgamator = await createAmalgamator()
+        const destructible = new Destructible($ => $(), 'amagamate.t')
+        const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'))
 
-        await Destructible.rescue(async function () {
+        destructible.rescue($ => $(), 'test', async function () {
             const gather = []
 
             await amalgamator.count()
@@ -468,20 +477,23 @@ require('proof')(36, async okay => {
             okay(gather, [ 'x', 'X', 'y', 'Y', 'z', 'Z' ], 'staged')
 
             console.log(require('util').inspect(amalgamator.status, { depth: null }))
+
+            destructible.destroy()
         })
 
-        await amalgamator.destructible.destroy().rejected
+        await destructible.rejected
     }
 
     {
-        const amalgamator = await createAmalgamator({
+        const destructible = new Destructible($ => $(), 'amagamate.t')
+        const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), {
             stage: {
-                leaf: { split: 16, merge: 16 },
-                branch: { split: 16, merge: 16 }
+                leaf: { split: 16, merge: 7 },
+                branch: { split: 16, merge: 7 }
             }
         })
 
-        await Destructible.rescue(async function () {
+        destructible.rescue($ => $(), 'test', async function () {
             const gather = []
 
             await amalgamator.count()
@@ -603,16 +615,22 @@ require('proof')(36, async okay => {
             await amalgamator.merge(mutators[0], del.concat(del.slice(0, 3)))
             amalgamator.locker.rollback(mutators.shift())
 
+            console.log('here')
             await amalgamator.drain()
+            console.log('there')
+
+            destructible.destroy()
+            console.log('here', destructible.destroyed)
         })
 
-        await amalgamator.destructible.destroy().rejected
+        await destructible.rejected
     }
 
     {
-        const amalgamator = await createAmalgamator({ conflictable: false })
+        const destructible = new Destructible($ => $(), 'amagamate.t')
+        const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), { conflictable: false })
 
-        await Destructible.rescue(async function () {
+        await destructible.rescue($ => $(), 'test', async function () {
             const gather = []
 
             const versions = new Set
@@ -706,8 +724,9 @@ require('proof')(36, async okay => {
             await rotate
 
             console.log('done')
+            destructible.destroy()
         })
 
-        await amalgamator.destructible.destroy().rejected
+        await destructible.rejected
     }
 })

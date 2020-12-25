@@ -23,17 +23,19 @@
     "dependencies":
     {
                             "ascension":                    "3.0.0-alpha.1",
-                            "b-tree":                       "2.0.0-alpha.66",
+                            "b-tree":                       "2.0.0-alpha.69",
                             "designate":                    "2.0.0-alpha.14",
                             "dilute":                       "2.0.0-alpha.6",
                             "extant":                       "^1.0.20",
                             "homogenize":                   "2.0.0-alpha.14",
                             "interrupt":                    "11.0.0-alpha.14",
+                            "magazine":                     "6.0.0-alpha.1",
                             "reciprocate":                  "0.0.3",
                             "rescue":                       "7.0.0-alpha.8",
                             "riffle":                       "2.0.0-alpha.46",
                             "skip":                         "0.2.12",
                             "splice":                       "3.0.0-alpha.32",
+                            "turnstile":                    "6.0.0-alpha.40",
                             "twiddle":                      "2.0.0-alpha.7",
                             "whittle":                      "0.0.0"
     },
