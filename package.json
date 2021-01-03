@@ -37,7 +37,7 @@
                             "skip":                         "0.2.12",
                             "splice":                       "3.0.0-alpha.32",
                             "turnstile":                    "6.0.0-alpha.43",
-                            "twiddle":                      "2.0.0-alpha.7",
+                            "twiddle":                      "2.0.0-alpha.8",
                             "whittle":                      "0.0.1"
     },
     "devDependencies":
