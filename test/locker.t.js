@@ -1,5 +1,5 @@
 require('proof')(16, async okay => {
-    const once = require('prospective/once')
+    const once = require('eject')
 
     class Amalgamator {
         constructor (locker) {

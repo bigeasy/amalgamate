@@ -26,6 +26,7 @@
                             "b-tree":                       "2.0.0-alpha.69",
                             "designate":                    "2.0.0-alpha.14",
                             "dilute":                       "2.0.0-alpha.6",
+                            "eject":                        "0.2.0",
                             "extant":                       "^1.0.20",
                             "homogenize":                   "2.0.0-alpha.14",
                             "interrupt":                    "11.0.0-alpha.14",
@@ -42,8 +43,7 @@
     "devDependencies":
     {
                             "destructible":                 "7.0.0-alpha.26",
-                            "proof":                        "^9.0.2",
-                            "prospective":                  "^0.3.0"
+                            "proof":                        "^9.0.2"
     },
     "main":                 "amalgamate",
     "scripts":
