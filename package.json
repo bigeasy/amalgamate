@@ -23,26 +23,29 @@
     "dependencies":
     {
                             "ascension":                    "3.0.0-alpha.2",
-                            "b-tree":                       "2.0.0-alpha.72",
+                            "b-tree":                       "2.0.0-alpha.81",
                             "designate":                    "2.0.0-alpha.15",
                             "dilute":                       "2.0.0-alpha.7",
-                            "eject":                        "0.2.0",
+                            "eject":                        "0.2.3",
                             "extant":                       "^1.0.20",
                             "homogenize":                   "2.0.0-alpha.15",
                             "interrupt":                    "11.0.0-alpha.16",
                             "magazine":                     "6.0.0-alpha.5",
+                            "operation":                    "6.0.0-alpha.4",
                             "reciprocate":                  "0.0.5",
+                            "perhaps":                      "0.0.6",
                             "rescue":                       "7.0.0-alpha.9",
-                            "riffle":                       "2.0.0-alpha.47",
-                            "skip":                         "0.2.14",
-                            "splice":                       "3.0.0-alpha.33",
-                            "turnstile":                    "6.0.0-alpha.43",
+                            "riffle":                       "2.0.0-alpha.56",
+                            "skip":                         "0.2.21",
+                            "splice":                       "3.0.0-alpha.41",
+                            "turnstile":                    "6.0.0-alpha.52",
                             "twiddle":                      "2.0.0-alpha.8",
-                            "whittle":                      "0.0.1"
+                            "whittle":                      "0.0.1",
+                            "writeahead":                   "0.0.13"
     },
     "devDependencies":
     {
-                            "destructible":                 "7.0.0-alpha.30",
+                            "destructible":                 "7.0.0-alpha.38",
                             "proof":                        "^9.0.2"
     },
     "main":                 "amalgamate",

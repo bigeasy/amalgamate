@@ -1,4 +1,4 @@
-require('proof')(36, async okay => {
+require('proof')(13, async okay => {
     function dump (object) {
         console.log(require('util').inspect(object, { depth: null }))
     }
@@ -9,10 +9,14 @@ require('proof')(36, async okay => {
     const fs = require('fs').promises
 
     const Trampoline = require('reciprocate')
+    const Operation = require('operation')
     const Destructible = require('destructible')
     const Amalgamator = require('..')
     const Turnstile = require('turnstile')
     const Locker = require('../locker')
+    const WriteAhead = require('writeahead')
+    const FileSystem = require('b-tree/filesystem')
+    const Magazine = require('magazine')
 
     const rescue = require('rescue')
 
@@ -33,31 +37,40 @@ require('proof')(36, async okay => {
         return { type: 'del', key: Buffer.from(letter) }
     })
 
-    const locker = new Locker({ heft: 1024 })
-    await locker.rotate()
-
     // TODO Why did I do this as buffers? Tests would be so much easier as
     // strings.
-    function createAmalgamator (destructible, options) {
+    async function createAmalgamator (destructible, options) {
+        await fs.mkdir(directory, { recursive: true })
+        const create = (await fs.readdir(directory)).length == 0
+        const directories = { wal: path.join(directory, 'wal'), tree: path.join(directory, 'trees', 'amalgamator') }
+        await fs.mkdir(directories.wal, { recursive: true })
+        await fs.mkdir(directories.tree, { recursive: true })
+        const writeahead = new WriteAhead(destructible.durable($ => $(), 'writeahead'), await WriteAhead.open({ directory: directories.wal }))
+        const handles = new Operation.Cache(new Magazine)
+        const locker = new Locker(destructible.durable($ => $(), 'locker'), await Locker.open(writeahead, { create }))
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        return Amalgamator.open(destructible, {
-            directory: directory,
+        const pages = new Magazine
+        return await locker.open(destructible.durable($ => $(), 'amalgamator'), {
+            directory: directories.tree,
+            handles,
+            create: options.create || false,
+            key: 'amalgamator',
+            checksum: () => '0',
+            extractor: function (parts) { return parts[0] },
+            serializer: {
+                key: {
+                    serialize: function (key) { return [ key ] },
+                    deserialize: function (parts) { return parts[0] }
+                },
+                parts: {
+                    serialize: function (parts) { return parts },
+                    deserialize: function (parts) { return parts }
+                }
+            }
+        }, {
             turnstile: turnstile,
-            locker: new Locker({ heft: 1024 * 8 }),
-            cache: new Cache,
+            pages: pages,
             comparator: Buffer.compare,
-            createIfMissing: true,
-            errorIfExists: false,
-            key: {
-                compare: Buffer.compare,
-                extract: function (parts) { return parts[0] },
-                serialize: function (key) { return [ key ] },
-                deserialize: function (parts) { return parts[0] }
-            },
-            parts: {
-                serialize: function (parts) { return parts },
-                deserialize: function (parts) { return parts }
-            },
             transformer: function (operation) {
                 if (operation.type == 'put') {
                     return {
@@ -71,47 +84,31 @@ require('proof')(36, async okay => {
                     key: operation.key
                 }
             },
-            primary: {
+            primary: options.primary || {
                 leaf: { split: 256, merge: 32 },
                 branch: { split: 256, merge: 32 },
             },
-            stage: {
+            stage: options.stage || {
                 leaf: { split: 256, merge: 32 },
                 branch: { split: 256, merge: 32 },
-            },
-            ...options
+            }
         })
+        await destructible.destroy().promise
     }
 
     {
-        try {
-            const destructible = new Destructible($ => $(), 'amagamate.t')
-            const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), { directory: __dirname })
-            console.log('here')
-            await destructible.rejected
-        } catch (error) {
-            rescue(error, [ Amalgamator.Error, { code: 'NOT_A_DATABASE' } ])
-            okay('not an appropriate directory')
-        }
-    }
+        const destructible = new Destructible(3000, $ => $(), 'amagamate.t')
 
-    {
-        try {
-            await fs.rmdir(directory, { recursive: true })
-            const destructible = new Destructible($ => $(), 'amagamate.t')
-            const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), { createIfMissing: false })
-            await destructible.rejected
-        } catch (error) {
-            rescue(error, [ Amalgamator.Error, { code: 'DOES_NOT_EXIST' } ])
-            okay('does not exist')
-        }
-    }
+        destructible.ephemeral($ => $(), 'test', async () => {
+            const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), { create: true })
 
-    {
-        const destructible = new Destructible($ => $(), 'amagamate.t')
-        const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'))
+            await new Promise(resolve => setImmediate(resolve))
 
-        destructible.rescue($ => $(), 'test', async () => {
+            if (amalgamator.destructible.destroyed) {
+                await destructible.promise
+                process.exit()
+            }
+
             const snapshots = [ amalgamator.locker.snapshot() ]
             let iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
 
@@ -145,7 +142,7 @@ require('proof')(36, async okay => {
 
             okay(mutator.conflicted, false, 'no conflicts')
 
-            amalgamator.locker.commit(mutator)
+            await amalgamator.locker.commit(mutator)
 
             snapshots.push(amalgamator.locker.snapshot())
 
@@ -331,14 +328,8 @@ require('proof')(36, async okay => {
                 const batch = i == 127 ? put.concat(del.slice(0, 13)) : put.concat(del)
                 await amalgamator.merge(mutator, batch, true)
                 assert(!mutator.conflicted)
-                amalgamator.locker.commit(mutator)
+                await amalgamator.locker.commit(mutator)
             }
-
-            //dump(amalgamator.locker.status)
-
-            await new Promise(resolve => setTimeout(resolve, 2500))
-
-            //dump(amalgamator.locker.status)
 
             snapshots.push(amalgamator.locker.snapshot())
 
@@ -363,24 +354,17 @@ require('proof')(36, async okay => {
                 'z', 'Z'
             ], 'amalgamate many')
 
+            amalgamator.locker.release(snapshots.shift())
+            await amalgamator.locker.drain()
+
             // TODO Reverse iterator.
+            console.log('calling destroy')
             destructible.destroy()
         })
 
-        await destructible.rejected
+        await destructible.promise
     }
-
-    {
-        try {
-            const destructible = new Destructible($ => $(), 'amagamate.t')
-            const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), { errorIfExists: true })
-            await amalgamator.destructible.rejected
-        } catch (error) {
-            rescue(error, [ Amalgamator.Error, { code: 'ALREADY_EXISTS' } ])
-            okay('error if exists')
-        }
-    }
-
+    return
     {
         const destructible = new Destructible($ => $(), 'amagamate.t')
         const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'))
@@ -393,6 +377,7 @@ require('proof')(36, async okay => {
             await amalgamator.locker.rotate()
 
             okay(amalgamator.status.stages[0].groups, [ 2 ], 'reopen')
+            process.exit()
 
             await amalgamator.locker.rotate()
 
@@ -481,7 +466,7 @@ require('proof')(36, async okay => {
             destructible.destroy()
         })
 
-        await destructible.rejected
+        await destructible.promise
     }
 
     {
@@ -623,7 +608,7 @@ require('proof')(36, async okay => {
             console.log('here', destructible.destroyed)
         })
 
-        await destructible.rejected
+        await destructible.promise
     }
 
     {
@@ -727,6 +712,6 @@ require('proof')(36, async okay => {
             destructible.destroy()
         })
 
-        await destructible.rejected
+        await destructible.promise
     }
 })

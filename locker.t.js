@@ -1,4 +1,20 @@
 require('proof')(16, async okay => {
+    const fs = require('fs').promises
+    const path = require('path')
+
+    const WriteAhead = require('writeahead')
+    const Destructible = require('destructible')
+    const Turnstile = require('turnstile')
+
+    const directory = path.join(__dirname, 'tmp', 'locker')
+
+    await fs.rmdir(directory, { recursive: true })
+    await fs.mkdir(directory, { recursive: true })
+
+    const open = await WriteAhead.open({ directory })
+    const destructible = new Destructible($ => $(), 'locker.t')
+    const writeahead = new WriteAhead(destructible, open)
+
     const once = require('eject')
 
     class Amalgamator {
@@ -26,7 +42,11 @@ require('proof')(16, async okay => {
     const amalgamated = []
 
     const Locker = require('../locker')
-    const locker = new Locker({ heft: 32 })
+    const _open = await Locker.open(writeahead, { heft: 32 })
+
+    const locker = new Locker(_open)
+
+    return
 
     const recover = new Map
     recover.set(2, true)
