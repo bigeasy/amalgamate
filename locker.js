@@ -26,9 +26,7 @@ function _unshift (groups, group, version) {
         min: version,
         max: version,
         mutations: new Map,
-        rotated: new Set,
-        amalgamated: new Set,
-        unstaged: new Set,
+        amalgamated: false,
         references: [ 0, 0 ],
         heft: 0
     })
@@ -168,7 +166,7 @@ class Locker extends events.EventEmitter {
         this._references++
         assert(this._shutdown == null)
         const groups = this._groups.filter((group, index) => {
-            return index == 0 || group.amalgamated.size != this._amalgamators.size
+            return index == 0 || ! group.amalgamated
         })
         groups.forEach((group, index) => group.references[index]++)
         return { groups, completed: this._completed  }
@@ -253,12 +251,7 @@ class Locker extends events.EventEmitter {
                 for (const mutation of group.mutations.values()) {
                     mutations.push(mutation)
                 }
-                return {
-                    ...group, mutations,
-                    rotated: group.rotated.size,
-                    amalgamated: group.amalgamated.size,
-                    unstaged: group.unstaged.size
-                }
+                return { ...group, mutations }
             })
         }
     }
@@ -301,13 +294,6 @@ class Locker extends events.EventEmitter {
         }
     }
 
-    unstaged (amalgamator) {
-        assert(!this._groups[1].unstaged.has(amalgamator))
-        this._groups[1].unstaged.add(amalgamator)
-        if (this._groups[1].unstaged.size == this._amalgamators.size) {
-        }
-    }
-
     release ({ groups }) {
         groups.forEach((group, index) => group.references[index]--)
         this._maybeAmalgamate()
@@ -315,16 +301,6 @@ class Locker extends events.EventEmitter {
         if (--this._references == 0) {
             this._zeroed.resolve()
         }
-    }
-    //
-
-    // Called by amalgamators when amalgamator heft changes. Heft only ever
-    // increases since the amalgamators are write-ahead logs.
-
-    //
-    heft (version, heft) {
-        this._groupByVersion(version).heft += heft
-        this._maybeRotate()
     }
     //
 
@@ -412,6 +388,7 @@ class Locker extends events.EventEmitter {
         for (const amalgamator of this._amalgamators.keys()) {
             await amalgamator.amalgamate(mutator)
         }
+        this._groups[1].amalgamated = true
         this._groups[1].state = 'amalgamated'
         this._unstage = new Future
         this._maybeUnstage()

@@ -317,7 +317,9 @@ class Amalgamator {
                 return item
             })
         })
-        const skips = this._stages.map(stage => {
+        const skips = this._stages.filter(stage => {
+            return snapshot.groups.some(group => group.group == stage.group)
+        }).map(stage => {
             const skip = mvcc.skip.strata(stage.strata, set, {
                 extractor: $ => [ extractor($) ],
                 group: group ? (sought, key) => {
@@ -389,7 +391,9 @@ class Amalgamator {
             })
         })
 
-        const riffles = this._stages.map(stage => {
+        const riffles = this._stages.filter(stage => {
+            return snapshot.groups.some(group => group.group == stage.group)
+        }).map(stage => {
             return mvcc.riffle(stage.strata, versioned, { slice: 32, inclusive, reverse })
         }).concat(primary).concat(additional)
         const homogenize = mvcc.homogenize(this.comparator.stage.key, riffles)
@@ -401,7 +405,9 @@ class Amalgamator {
     }
 
     get (snapshot, trampoline, key, consume) {
-        const candidates = [], stages = this._stages.slice()
+        const candidates = [], stages = this._stages.filter(stage => {
+            return snapshot.groups.some(group => group.group == stage.group)
+        })
         const get = () => {
             if (stages.length == 0) {
                 const winner = coalesce(candidates.sort(this.comparator.stage.item)[0], {
@@ -550,7 +556,6 @@ class Amalgamator {
         const writes = {}
         const version = mutator.mutation.version
         const group = this.locker.group(version)
-        const stages = this._stages.slice(0)
         const stage = this._stages.filter(stage => stage.group == group).pop()
         const transforms = operations.map(operation => {
             const order = mutator.mutation.order++
