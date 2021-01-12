@@ -50,14 +50,24 @@ const Magazine = require('magazine')
 // zero position of the stage array and the reference count in the zero position
 // of the reference array reaches zero. Obviously, the reference count in the
 // zero position of the reference array will not increase from zero after the
-// has been shifted out of the zero position of the stage array. The reference
-// count is not based on readers or writers, but the position. Writers do not
-// want the zero position to stage to be merged because they are still writing
-// to it. Readers do not want the zero position stage to be merged because they
-// may be reading only a subset of the versions for that stage. When the stage
+// has been shifted out of the zero position of the stage array.
+
+// The reference count is not based on readers or writers, but the position.
+// Writers do not want the zero position stage to be merged because they are
+// still writing to it.
+
+// Readers do not want the zero position stage to be merged because they may be
+// reading only a subset of the versions for that stage. When the stage
 // is merged the version will be changed to zero and unless they stage has a
 // version that overrides the zero, the new value will be returned from a
 // reader, ruining the isolation.
+
+// We need three stages, rotate, amalgamate and unstage so we can go from the
+// kick-off to waiting for writers to drain to waiting for readers to drain.
+
+// We no longer assert that there are only two stages. We instead amalgamate a
+// homogenized set of stages, all the stages after the rotated stage, so that
+// once that succeeds we can eliminate all of the old logs and old stages.
 
 //
 class Amalgamator {
@@ -541,7 +551,7 @@ class Amalgamator {
         const version = mutator.mutation.version
         const group = this.locker.group(version)
         const stages = this._stages.slice(0)
-        const stage = this._stages.filter(stage => ~stage.groups.indexOf(group)).pop()
+        const stage = this._stages.filter(stage => stage.group == group).pop()
         const transforms = operations.map(operation => {
             const order = mutator.mutation.order++
             const transform = this._transformer(operation, order)

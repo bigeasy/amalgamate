@@ -132,7 +132,7 @@ class Locker extends events.EventEmitter {
         if (open.stages.length == 0) {
             open.stages.push({
                 name: `stage.${this._groups[0].group}`,
-                groups: [ this._groups[0].group ],
+                group: this._groups[0].group,
                 count: 0,
                 key: this._groups[0].group,
                 storage: await WriteAheadOnly.open({
@@ -387,7 +387,7 @@ class Locker extends events.EventEmitter {
         for (const [ amalgamator, { key, options } ]  of this._amalgamators) {
             const stage = {
                 name: `stage.${this._group}`,
-                groups: [ this._group ],
+                group: this._group,
                 count: 0,
                 key: this._group,
                 storage: await WriteAheadOnly.open({
