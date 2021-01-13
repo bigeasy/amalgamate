@@ -618,7 +618,6 @@ class Amalgamator {
                 }
             }
         }
-        await Strata.flush(writes)
         this.rotator.advance()
     }
 

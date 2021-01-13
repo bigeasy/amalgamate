@@ -322,13 +322,17 @@ require('proof')(13, async okay => {
 
             amalgamator.rotator.locker.release(snapshots.shift())
 
+            console.log('much loop')
+
             for (let i = 0; i < 128; i++) {
+                const start = Date.now()
                 const mutator = amalgamator.rotator.locker.mutator()
                 const version = i + 1
                 const batch = i == 127 ? put.concat(del.slice(0, 13)) : put.concat(del)
                 await amalgamator.merge(mutator, batch, true)
                 assert(!mutator.conflicted)
                 await amalgamator.rotator.commit(mutator)
+                //console.log(Date.now() - start)
             }
 
             snapshots.push(amalgamator.rotator.locker.snapshot())

@@ -132,12 +132,12 @@ class Rotator {
     }
 
     commit (mutation) {
-        const promise = this._writeahead.write([{
+        const future = this._writeahead.write([{
             keys: [ 'commit' ],
             buffer: (this._recorder)([[ Buffer.from(JSON.stringify(mutation.mutation.version)) ]])
         }])
         this.locker.commit(mutation)
-        return promise
+        return future.promise
     }
 
     async _rotate (group) {
