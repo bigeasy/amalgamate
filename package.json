@@ -23,7 +23,7 @@
     "dependencies":
     {
                             "ascension":                    "3.0.0-alpha.2",
-                            "b-tree":                       "2.0.0-alpha.81",
+                            "b-tree":                       "2.0.0-alpha.82",
                             "designate":                    "2.0.0-alpha.15",
                             "dilute":                       "2.0.0-alpha.7",
                             "eject":                        "0.2.3",
@@ -35,9 +35,9 @@
                             "reciprocate":                  "0.0.5",
                             "perhaps":                      "0.0.6",
                             "rescue":                       "7.0.0-alpha.9",
-                            "riffle":                       "2.0.0-alpha.56",
-                            "skip":                         "0.2.21",
-                            "splice":                       "3.0.0-alpha.41",
+                            "riffle":                       "2.0.0-alpha.57",
+                            "skip":                         "0.2.22",
+                            "splice":                       "3.0.0-alpha.42",
                             "turnstile":                    "6.0.0-alpha.52",
                             "twiddle":                      "2.0.0-alpha.8",
                             "whittle":                      "0.0.1",

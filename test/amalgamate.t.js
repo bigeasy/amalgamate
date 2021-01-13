@@ -8,6 +8,7 @@ require('proof')(13, async okay => {
     const path = require('path')
     const fs = require('fs').promises
 
+    const Rotator = require('../rotator')
     const Trampoline = require('reciprocate')
     const Operation = require('operation')
     const Destructible = require('destructible')
@@ -47,10 +48,10 @@ require('proof')(13, async okay => {
         await fs.mkdir(directories.tree, { recursive: true })
         const writeahead = new WriteAhead(destructible.durable($ => $(), 'writeahead'), await WriteAhead.open({ directory: directories.wal }))
         const handles = new Operation.Cache(new Magazine)
-        const locker = new Locker(destructible.durable($ => $(), 'locker'), await Locker.open(writeahead, { create }))
+        const rotator = new Rotator(destructible.durable($ => $(), 'rotator'), await Rotator.open(writeahead, { create }))
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const pages = new Magazine
-        return await locker.open(destructible.durable($ => $(), 'amalgamator'), {
+        return await rotator.open(destructible.durable($ => $(), 'amalgamator'), {
             directory: directories.tree,
             handles,
             create: options.create || false,
@@ -93,7 +94,6 @@ require('proof')(13, async okay => {
                 branch: { split: 256, merge: 32 },
             }
         })
-        await destructible.destroy().promise
     }
 
     {
@@ -109,7 +109,7 @@ require('proof')(13, async okay => {
                 process.exit()
             }
 
-            const snapshots = [ amalgamator.locker.snapshot() ]
+            const snapshots = [ amalgamator.rotator.locker.snapshot() ]
             let iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
 
             const trampoline = new Trampoline
@@ -119,9 +119,9 @@ require('proof')(13, async okay => {
             }
             okay(iterator.done, 'empty')
 
-            amalgamator.locker.release(snapshots.shift())
+            amalgamator.rotator.locker.release(snapshots.shift())
 
-            const mutator = amalgamator.locker.mutator()
+            const mutator = amalgamator.rotator.locker.mutator()
 
             await amalgamator.merge(mutator, [{
                 type: 'put',
@@ -142,9 +142,9 @@ require('proof')(13, async okay => {
 
             okay(mutator.conflicted, false, 'no conflicts')
 
-            await amalgamator.locker.commit(mutator)
+            await amalgamator.rotator.commit(mutator)
 
-            snapshots.push(amalgamator.locker.snapshot())
+            snapshots.push(amalgamator.rotator.locker.snapshot())
 
             const gather = []
             iterator = amalgamator.iterator(snapshots[0], 'forward', Buffer.from('a'), true)
@@ -320,18 +320,18 @@ require('proof')(13, async okay => {
             }
             okay(gather, [ null ], 'staged get missing')
 
-            amalgamator.locker.release(snapshots.shift())
+            amalgamator.rotator.locker.release(snapshots.shift())
 
             for (let i = 0; i < 128; i++) {
-                const mutator = amalgamator.locker.mutator()
+                const mutator = amalgamator.rotator.locker.mutator()
                 const version = i + 1
                 const batch = i == 127 ? put.concat(del.slice(0, 13)) : put.concat(del)
                 await amalgamator.merge(mutator, batch, true)
                 assert(!mutator.conflicted)
-                await amalgamator.locker.commit(mutator)
+                await amalgamator.rotator.commit(mutator)
             }
 
-            snapshots.push(amalgamator.locker.snapshot())
+            snapshots.push(amalgamator.rotator.locker.snapshot())
 
             gather.length = 0
 
@@ -354,8 +354,7 @@ require('proof')(13, async okay => {
                 'z', 'Z'
             ], 'amalgamate many')
 
-            amalgamator.locker.release(snapshots.shift())
-            await amalgamator.locker.drain()
+            amalgamator.rotator.locker.release(snapshots.shift())
 
             // TODO Reverse iterator.
             console.log('calling destroy')

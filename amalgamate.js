@@ -78,14 +78,12 @@ class Amalgamator {
         NOT_SAME_STAGE: 'destructible and destructible of turnstile must be in the same shutdown stage'
     })
 
-    constructor (destructible, locker, open, options) {
+    constructor (destructible, rotator, open, options) {
         // Implement the Destructible deferrable pattern.
         this.destructible = destructible
 
         this.deferrable = destructible.durable($ => $(), { countdown: 1 }, 'deferrable')
         this.destructible.destruct(() => this.deferrable.decrement())
-
-        this.destructible.destruct(() => this.locker.destroyed = true)
 
         this._destructible = {
             strata: this.destructible.durable($ => $(), 'strata'),
@@ -93,7 +91,7 @@ class Amalgamator {
             unstage: this.deferrable.durable($ => $(), { countdown: 1 }, 'unstage')
         }
 
-        this.locker = locker
+        this.rotator = rotator
 
         // Whether or not this Amalgamator should check for conflicts.
         this._conflictable = coalesce(options.conflictable, true)
@@ -163,9 +161,9 @@ class Amalgamator {
         this.deferrable.destruct(() => {
             this._open = false
             destructible.ephemeral('shutdown', async () => {
-                await this.locker.drain()
-                await this._destructible.amalgamate.decrement()
-                await this._destructible.unstage.decrement()
+                await this.rotator.done()
+                this._destructible.amalgamate.decrement()
+                this._destructible.unstage.decrement()
                 for (const strata of [ this.primary ].concat(this._stages.map(stage => stage.strata))) {
                     strata.deferrable.decrement()
                 }
@@ -352,7 +350,7 @@ class Amalgamator {
         const homogenized = mvcc.homogenize(this.comparator.stage.key, skips)
         const diluted = mvcc.twiddle(homogenized, items => {
             return items.map(item => {
-                item.items = item.items.filter(item => this.locker.visible(item.key[1], snapshot))
+                item.items = item.items.filter(item => this.rotator.locker.visible(item.key[1], snapshot))
                 return item
             })
         })
@@ -398,7 +396,7 @@ class Amalgamator {
         }).concat(primary).concat(additional)
         const homogenize = mvcc.homogenize(this.comparator.stage.key, riffles)
         const visible = mvcc.dilute(homogenize, item => {
-            return this.locker.visible(item.key[1], snapshot) ? 1 : 0
+            return this.rotator.locker.visible(item.key[1], snapshot) ? 1 : 0
         })
         const designate = mvcc.designate(this.comparator.primary, visible)
         return mvcc.dilute(designate, item => item.parts[0].method == 'remove' ? 0 : 1)
@@ -421,7 +419,7 @@ class Amalgamator {
                         index < items.length &&
                         this.comparator.primary(items[index].key[0], key) == 0
                     ) {
-                        if (this.locker.visible(items[index].key[1], snapshot)) {
+                        if (this.rotator.locker.visible(items[index].key[1], snapshot)) {
                             candidates.push(items[index])
                             break
                         }
@@ -466,7 +464,7 @@ class Amalgamator {
     async _amalgamate (mutator, stage) {
         const riffle = mvcc.riffle(stage.strata, Strata.MIN)
         const visible = mvcc.dilute(riffle, item => {
-            return this.locker.visible(item.key[1], mutator) ? 1 : 0
+            return this.rotator.locker.visible(item.key[1], mutator) ? 1 : 0
         })
         const designate = mvcc.designate(this.comparator.primary, visible)
         await mvcc.splice(item => {
@@ -485,7 +483,6 @@ class Amalgamator {
     //
     async amalgamate (mutator) {
         for (const stage of this._stages.slice(1)) {
-            console.log(stage.groups)
             await this._amalgamate(mutator, stage)
         }
     }
@@ -498,11 +495,12 @@ class Amalgamator {
     // that we both reused the first stage and have multiple old stages.
 
     //
-    unstage () {
+    async unstage () {
         while (this._stages.length != 1) {
             const stage = this._stages.pop()
             stage.strata.destructible.destroy()
             stage.strata.deferrable.decrement()
+            await stage.strata.deferrable.done
         }
     }
 
@@ -512,14 +510,14 @@ class Amalgamator {
             i < I && this.comparator.primary(items[i].key[0], key) == 0;
             i++
         ) {
-            this.locker.conflicted(items[i].key[1], mutator)
+            this.rotator.locker.conflicted(items[i].key[1], mutator)
         }
         for (
             let i = index - 1;
             i >= 0 && this.comparator.primary(items[i].key[0], key) == 0;
             i--
         ) {
-            this.locker.conflicted(items[i].key[1], mutator)
+            this.rotator.locker.conflicted(items[i].key[1], mutator)
         }
     }
 
@@ -555,7 +553,7 @@ class Amalgamator {
         const extra = counted ? { count: operations.length } : {}
         const writes = {}
         const version = mutator.mutation.version
-        const group = this.locker.group(version)
+        const group = this.rotator.locker.group(version)
         const stage = this._stages.filter(stage => stage.group == group).pop()
         const transforms = operations.map(operation => {
             const order = mutator.mutation.order++
@@ -621,13 +619,11 @@ class Amalgamator {
             }
         }
         await Strata.flush(writes)
-        this.locker.check()
+        this.rotator.advance()
     }
 
     _drain () {
         return [
-            this._destructible.amalgamate.drain(),
-            this._destructible.unstage.drain(),
             this.primary.drain()
         ].concat(this._stages.map(stage => stage.strata.drain()))
          .filter(drain => drain != null)
