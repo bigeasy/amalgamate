@@ -165,6 +165,7 @@ class Locker {
             this._groups[0].state == 'appending' &&
             this._size[0].max < this.position
         ) {
+        console.log(this._size[0].max, this.position)
             while (this._size.length != 1) {
                 this._unstaged.push(this._size.shift())
             }

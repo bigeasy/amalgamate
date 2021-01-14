@@ -15,15 +15,19 @@ const Future = require('perhaps')
 
 //
 class Rotator {
-    constructor (destructible, { writeahead, size, checksum, locker }) {
-        this.locker = locker
+    // **TODO** No need to double checksum the write-ahead log. Starting to feel
+    // like the write-ahead log should return an array of buffers, it should do
+    // the partitioning for you, because we're doing it twice. Once in the log
+    // and once it comes out of the log.
+    constructor (destructible, { writeahead, mutations, version }, { size = 1024 * 1024 } = {}) {
+        this.locker = new Locker({ mutations, version, size })
         this.destructible = destructible
         this.destructible.destruct(() => this.locker.destroy())
         this._amalgamators = new Map
         this._writeahead = writeahead
         this._zeroed = Future.resolve()
         this._rotated = Future.resolve()
-        this._recorder = Recorder.create(checksum)
+        this._recorder = Recorder.create(() => '0')
         const rotator = this.destructible.durable($ => $(), 'rotate', this._rotate())
         writeahead.deferrable.increment()
         destructible.destruct(() => {
@@ -35,8 +39,8 @@ class Rotator {
         })
     }
 
-    static async open (writeahead, { create = false, size = 1024 * 1024, checksum = () => '0' } = {}) {
-        const player = new Player(checksum)
+    static async open (writeahead, { create = false } = {}) {
+        const player = new Player(() => '0')
         const mutations = new Map
         let version = 0
         for await (const buffer of writeahead.get('commit')) {
@@ -50,7 +54,7 @@ class Rotator {
                 version = Math.max(version, mutation.version)
             }
         }
-        return { writeahead, size, checksum, locker: new Locker({ mutations, version, size, size }) }
+        return { writeahead, mutations, version }
     }
 
     async open (destructible, { directory, handles, create, key, serializer, checksum, extractor }, options) {
@@ -142,9 +146,7 @@ class Rotator {
 
     async _rotate (group) {
         for (;;) {
-            console.log(this.locker.rotating.fulfilled)
             const group = await this.locker.rotating.promise
-            console.log('will rotate', group)
             if (group == null) {
                 break
             }
@@ -174,13 +176,10 @@ class Rotator {
             await this.locker.unstaging.promise
             for (const amalgamator of this._amalgamators.keys()) {
                 this.destructible.progress()
-                console.log('will unstage')
                 await amalgamator.unstage()
-                console.log('did unstage')
             }
             this.locker.unstaged()
         }
-        console.log('did done')
     }
 
     _drain () {

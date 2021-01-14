@@ -145,14 +145,18 @@ class Amalgamator {
 
         this.strata = strata
 
-        this.primary = new Strata(this._destructible.strata.durable($ => $(), 'primary'), {
-            ...options.primary,
-            storage: open.storage,
-            turnstile: options.turnstile,
-            pages: options.pages.magazine(),
-            comparator: this.comparator.primary,
-            extractor: options.extractor
-        })
+        {
+            const destructible = this._destructible.strata.durable($ => $(), 'primary')
+            const storage = new FileSystem.Writer(destructible.durable($ => $(), 'storage'), open.storage)
+            this.primary = new Strata(destructible.durable($ => $(), 'strata'), {
+                ...options.primary,
+                storage: storage,
+                turnstile: options.turnstile,
+                pages: options.pages.magazine(),
+                comparator: this.comparator.primary,
+                extractor: options.extractor
+            })
+        }
         for (const stage of open.stages) {
             this._newStage(stage)
             this._stages.push(stage)
@@ -211,9 +215,11 @@ class Amalgamator {
     // Create a new staging tree. The caller will determine if the tree should
     // be opened or created.
     _newStage (open) {
-        open.strata = new Strata(this._destructible.strata.ephemeral($ => $(), open.name), {
+        const destructible = open.destructible = this._destructible.strata.ephemeral($ => $(), open.name)
+        const storage = new WriteAheadOnly.Writer(destructible.durable($ => $(), 'storage'), open.storage)
+        open.strata = new Strata(destructible.durable($ => $(), 'strata'), {
             ...this.strata.stage,
-            storage: open.storage,
+            storage: storage,
             turnstile: this._turnstile,
             comparator: {
                 zero: object => {
@@ -498,7 +504,7 @@ class Amalgamator {
     async unstage () {
         while (this._stages.length != 1) {
             const stage = this._stages.pop()
-            stage.strata.destructible.destroy()
+            stage.destructible.destroy()
             stage.strata.deferrable.decrement()
             await stage.strata.deferrable.done
         }

@@ -40,7 +40,7 @@ require('proof')(13, async okay => {
 
     // TODO Why did I do this as buffers? Tests would be so much easier as
     // strings.
-    async function createAmalgamator (destructible, options) {
+    async function createAmalgamator (destructible, options = {}) {
         await fs.mkdir(directory, { recursive: true })
         const create = (await fs.readdir(directory)).length == 0
         const directories = { wal: path.join(directory, 'wal'), tree: path.join(directory, 'trees', 'amalgamator') }
@@ -48,13 +48,13 @@ require('proof')(13, async okay => {
         await fs.mkdir(directories.tree, { recursive: true })
         const writeahead = new WriteAhead(destructible.durable($ => $(), 'writeahead'), await WriteAhead.open({ directory: directories.wal }))
         const handles = new Operation.Cache(new Magazine)
-        const rotator = new Rotator(destructible.durable($ => $(), 'rotator'), await Rotator.open(writeahead, { create }))
+        const rotator = new Rotator(destructible.durable($ => $(), 'rotator'), await Rotator.open(writeahead, { create }), { size: 1024 * 1024 / 4 })
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const pages = new Magazine
         return await rotator.open(destructible.durable($ => $(), 'amalgamator'), {
             directory: directories.tree,
             handles,
-            create: options.create || false,
+            create: create,
             key: 'amalgamator',
             checksum: () => '0',
             extractor: function (parts) { return parts[0] },
@@ -97,7 +97,7 @@ require('proof')(13, async okay => {
     }
 
     {
-        const destructible = new Destructible(3000, $ => $(), 'amagamate.t')
+        const destructible = new Destructible($ => $(), 'amagamate.t')
 
         destructible.ephemeral($ => $(), 'test', async () => {
             const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), { create: true })
@@ -322,8 +322,6 @@ require('proof')(13, async okay => {
 
             amalgamator.rotator.locker.release(snapshots.shift())
 
-            console.log('much loop')
-
             for (let i = 0; i < 128; i++) {
                 const start = Date.now()
                 const mutator = amalgamator.rotator.locker.mutator()
@@ -360,8 +358,7 @@ require('proof')(13, async okay => {
 
             amalgamator.rotator.locker.release(snapshots.shift())
 
-            // TODO Reverse iterator.
-            console.log('calling destroy')
+            // **TODO** Reverse iterator.
             destructible.destroy()
         })
 
@@ -371,7 +368,6 @@ require('proof')(13, async okay => {
     {
         const destructible = new Destructible($ => $(), 'amagamate.t')
         const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'))
-
         destructible.rescue($ => $(), 'test', async function () {
             const gather = []
 
