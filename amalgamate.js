@@ -629,12 +629,11 @@ class Amalgamator {
     // subsequent checks after one has marked your mutation as conflicted.
 
     //
-    async merge (mutator, operations, counted = false) {
-        const extra = counted ? { count: operations.length } : {}
+    async merge (mutator, operations) {
         const writes = {}
         const version = mutator.mutation.version
         const group = this.rotator.locker.group(version)
-        const unamalgamated = this._stages.filter(stage => ! stage.amalgamated)
+        const unamalgamated = this._stages.filter(stage => stage.appending)
         assert(unamalgamated.length == 1 || unamalgamated.length == 2)
         const stage = unamalgamated[0].group == group ? unamalgamated.shift() : unamalgamated.pop()
         const secondary = unamalgamated.pop()
@@ -668,7 +667,7 @@ class Amalgamator {
                         this._conflicted(mutator, cursor.page.items, index, key)
                     }
                     // TODO The `version` and `order` are already in the key.
-                    const header = { version, method, order, ...extra }
+                    const header = { version, method, order }
                     if (method == 'insert') {
                         heft += cursor.insert(index, compound, [ header ].concat(parts), writes)
                     } else {

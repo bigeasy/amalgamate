@@ -1,4 +1,4 @@
-require('proof')(13, async okay => {
+require('proof')(19, async okay => {
     function dump (object) {
         console.log(require('util').inspect(object, { depth: null }))
     }
@@ -368,25 +368,13 @@ require('proof')(13, async okay => {
     {
         const destructible = new Destructible($ => $(), 'amagamate.t')
         const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'))
-        return
-        destructible.rescue($ => $(), 'test', async function () {
-            const gather = []
-
-            await amalgamator.count()
-
-            await amalgamator.locker.rotate()
-
-            okay(amalgamator.status.stages[0].groups, [ 2 ], 'reopen')
-            process.exit()
-
-            await amalgamator.locker.rotate()
-
-            okay(amalgamator.status.stages[0].groups, [ 3 ], 'no-op rotate')
-
-            const snapshots = [ amalgamator.locker.snapshot() ]
+        destructible.ephemeral($ => $(), 'test', async function () {
+            const snapshots = [ amalgamator.rotator.locker.snapshot() ]
 
             const trampoline = new Trampoline
             let iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
+
+            const gather = []
 
             while (! iterator.done) {
                 iterator.next(trampoline, items => {
@@ -425,17 +413,18 @@ require('proof')(13, async okay => {
             }
             okay(gather, [ null ], 'amalgamated get missing')
 
-            const mutator = amalgamator.locker.mutator()
+            const mutator = amalgamator.rotator.locker.mutator()
 
-            okay(mutator.mutation.version, 4, 'clean shutdown')
+            // **TODO** Reset versions if we rotate to zero.
+            okay(mutator.mutation.version, 132, 'clean shutdown')
 
             await amalgamator.merge(mutator, put.concat(del.slice(0, 23)), true)
 
-            amalgamator.locker.commit(mutator)
+            amalgamator.rotator.locker.commit(mutator)
 
-            amalgamator.locker.release(snapshots.shift())
+            amalgamator.rotator.locker.release(snapshots.shift())
 
-            snapshots.push(amalgamator.locker.snapshot())
+            snapshots.push(amalgamator.rotator.locker.snapshot())
 
             gather.length = 0
             amalgamator.get(snapshots[0], trampoline, Buffer.from('n'), item => {
@@ -445,8 +434,8 @@ require('proof')(13, async okay => {
                 await trampoline.shift()
             }
             okay(gather, [ null ], 'amalgamated get primary and staging merge')
-            gather.length = 0
 
+            gather.length = 0
             iterator = amalgamator.iterator(snapshots[0], 'forward', null, true)
             while (! iterator.done) {
                 iterator.next(trampoline, items => {
@@ -468,6 +457,7 @@ require('proof')(13, async okay => {
 
         await destructible.promise
     }
+    return
 
     {
         const destructible = new Destructible($ => $(), 'amagamate.t')

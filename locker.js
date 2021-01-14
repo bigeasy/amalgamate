@@ -14,6 +14,7 @@ class Locker {
         this._group = this._groups[0].max + 1
         this._version = version + 1
         this._order = 1
+        this._completed = 0
         this._unstaged = []
         this.destroyed = false
         this.position = 0

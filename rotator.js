@@ -113,15 +113,18 @@ class Rotator {
         for await (const entries of WriteAheadOnly.wal.iterator(this._writeahead, [ 'locate' ], key)) {
             for (const entry of entries) {
                 const key = entry.header.value
-                const storage = await WriteAheadOnly.open({ writeahead: this._writeahead, key })
+                const storage = await WriteAheadOnly.open({ writeahead: this._writeahead, key, ...open.options })
+                console.log('hello')
                 open.stages.push({
                     name: `stage.${key[1]}`,
                     group: this.locker.latest,
                     count: 0,
+                    appending: false,
                     storage: storage
                 })
             }
         }
+        open.stages.reverse()
         if (open.stages.length == 0) {
             console.log('creating')
             open.stages.push({
@@ -129,6 +132,7 @@ class Rotator {
                 group: this.locker.latest,
                 count: 0,
                 key: this.locker.latest,
+                appending: true,
                 storage: await WriteAheadOnly.open({
                     ...open.options,
                     writeahead: this._writeahead,
@@ -136,6 +140,8 @@ class Rotator {
                     create: [ [ 'locate' ], key ]
                 })
             })
+        } else {
+            open.stages[0].appending = true
         }
         const amalgamator = new Amalgamator(destructible, this, open, options)
         this._amalgamators.set(amalgamator, { key, options: open.options })
@@ -174,7 +180,8 @@ class Rotator {
                     group: group,
                     count: 0,
                     key: group,
-                    storage: storage
+                    storage: storage,
+                    appending: true
                 })
             }
             this.locker.rotated()
