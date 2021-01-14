@@ -245,62 +245,6 @@ class Amalgamator {
         open.strata.deferrable.increment()
     }
 
-    async count () {
-        assert(~this._stages[0].groups.indexOf(1))
-        const recoveries = new Map, counts = {}, trampoline = new Trampoline
-        for (const stage of this._stages.slice(1)) {
-            const iterator = mvcc.riffle(stage.strata, Strata.MIN)
-            while (! iterator.done) {
-                iterator.next(trampoline, items => {
-                    for (const item of items) {
-                        const { version, count } = item.parts[0]
-                        recoveries.set(version, false)
-                        if (counts[version] == null) {
-                            counts[version] = count
-                        }
-                        if (--counts[version] == 0) {
-                            recoveries.set(version, true)
-                        }
-                        stage.count++
-                    }
-                })
-                while (trampoline.seek()) {
-                    await trampoline.shift()
-                }
-            }
-        }
-        this.locker.recover(recoveries)
-    }
-
-    // Assumes external storage for committed versions. We don't want to hand
-    // the results of external storage directly to the locker because it is
-    // probably not perfectly in sync with the stages. We want to make sure that
-    // the versions read from version storage are actually in the stages so that
-    // we can return to version 1 if we completely amalgamated before the
-    // preceding shutdown.
-
-    //
-    async recover (versions) {
-        assert(~this._stages[0].groups.indexOf(1))
-        const recoveries = new Map, trampoline = new Trampoline
-        for (const stage of this._stages.slice(1)) {
-            const iterator = mvcc.riffle(stage.strata, Strata.MIN)
-            while (! iterator.done) {
-                iterator.next(trampoline, items => {
-                    for (const item of items) {
-                        const { version } = item.parts[0]
-                        recoveries.set(version, versions.has(version))
-                        stage.count++
-                    }
-                })
-                while (trampoline.seek()) {
-                    await trampoline.shift()
-                }
-            }
-        }
-        this.locker.recover(recoveries)
-    }
-
     map (snapshot, set, {
         extractor = $ => $,
         additional = [],
