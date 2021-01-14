@@ -178,6 +178,9 @@ class Rotator {
                 this.destructible.progress()
                 await amalgamator.unstage()
             }
+            while (this._writeahead._logs.length != 1) {
+                await this._writeahead.shift()
+            }
             this.locker.unstaged()
         }
     }
