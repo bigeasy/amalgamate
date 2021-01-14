@@ -1,6 +1,6 @@
 {
     "name":                 "amalgamate",
-    "version":              "0.1.38",
+    "version":              "0.1.39",
     "description":
 
       "Merge staging Strata b-trees containing MVCC versioned records into a primary Strata b-tree. ",
@@ -32,8 +32,8 @@
                             "interrupt":                    "11.0.0-alpha.16",
                             "magazine":                     "6.0.0-alpha.5",
                             "operation":                    "6.0.0-alpha.4",
-                            "reciprocate":                  "0.0.5",
                             "perhaps":                      "0.0.6",
+                            "reciprocate":                  "0.0.5",
                             "rescue":                       "7.0.0-alpha.9",
                             "riffle":                       "2.0.0-alpha.59",
                             "skip":                         "0.2.23",
