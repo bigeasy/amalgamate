@@ -1,9 +1,15 @@
-require('proof')(3, async okay => {
+require('proof')(4, async okay => {
     const fs = require('fs').promises
     const path = require('path')
 
     const Locker = require('../locker')
     const locker = new Locker({ muatations: new Map, version: 0, size: 1024 })
+
+    const snapshots = [ locker.snapshot() ]
+
+    okay(locker.visible(0, snapshots[0]), 'zero is primary tree and always visible')
+
+    locker.release(snapshots.shift())
 
     okay(locker.latest, 0, 'group is default zero')
     okay(! locker.rotating.fulfilled, 'would not rotate')
@@ -24,8 +30,6 @@ require('proof')(3, async okay => {
     }
 
     const amalgamators = [ new Amalgamator(locker), new Amalgamator(locker) ]
-
-    const snapshots = [ locker.snapshot() ]
 
     okay(locker.visible(0, snapshots[0]), 'zero is visible')
 

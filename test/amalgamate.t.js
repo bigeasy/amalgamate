@@ -140,7 +140,7 @@ require('proof')(13, async okay => {
                 key: Buffer.from('b')
             }], true)
 
-            okay(mutator.conflicted, false, 'no conflicts')
+            okay(mutator.mutation.conflicted, false, 'no conflicts')
 
             await amalgamator.rotator.commit(mutator)
 
@@ -364,10 +364,11 @@ require('proof')(13, async okay => {
 
         await destructible.promise
     }
-    return
+
     {
         const destructible = new Destructible($ => $(), 'amagamate.t')
         const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'))
+        return
         destructible.rescue($ => $(), 'test', async function () {
             const gather = []
 

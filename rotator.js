@@ -50,7 +50,7 @@ class Rotator {
                     completed: 0,
                     rolledback: false
                 }
-                mutations.set(version, mutation)
+                mutations.set(mutation.version, mutation)
                 version = Math.max(version, mutation.version)
             }
         }
@@ -110,9 +110,20 @@ class Rotator {
                 }
             }
         }
-        for await (const entry of WriteAheadOnly.wal.iterator(this._writeahead, key, 'stage')) {
+        for await (const entries of WriteAheadOnly.wal.iterator(this._writeahead, [ 'locate' ], key)) {
+            for (const entry of entries) {
+                const key = entry.header.value
+                const storage = await WriteAheadOnly.open({ writeahead: this._writeahead, key })
+                open.stages.push({
+                    name: `stage.${key[1]}`,
+                    group: this.locker.latest,
+                    count: 0,
+                    storage: storage
+                })
+            }
         }
         if (open.stages.length == 0) {
+            console.log('creating')
             open.stages.push({
                 name: `stage.${this.locker.latest}`,
                 group: this.locker.latest,

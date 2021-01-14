@@ -509,50 +509,124 @@ class Amalgamator {
             await stage.strata.deferrable.done
         }
     }
+    //
 
+    // Gather the versions of competitors.
+
+    //
     _conflicted (mutator, items, index, key) {
         for (
             let i = index, I = items.length;
             i < I && this.comparator.primary(items[i].key[0], key) == 0;
             i++
         ) {
-            this.rotator.locker.conflicted(items[i].key[1], mutator)
+            mutator.mutation.competitors.add(items[i].key[1])
+            //this.rotator.locker.conflicted(items[i].key[1], mutator)
         }
         for (
             let i = index - 1;
             i >= 0 && this.comparator.primary(items[i].key[0], key) == 0;
             i--
         ) {
-            this.rotator.locker.conflicted(items[i].key[1], mutator)
+            mutator.mutation.competitors.add(items[i].key[1])
+            //this.rotator.locker.conflicted(items[i].key[1], mutator)
         }
     }
+    //
 
-    // TODO Note that we are now racing to mark conflicts and even if we do
-    // something like rollback immediately. Already I'm considering a possible
-    // locking mechanism. Easy to reason about conflicts in one stage, but hard
-    // to reason about the race conditions when checking the second stage.
-    // Currently, inserting everything and checking the primary stage, then
-    // checking the secondary stage subsequently. If a stage running in parallel
-    // does the same thing, it should detect conflicts. What if a second stage
-    // is added during the insert, though?
-    //
-    // There was a race condition here that I didn't see before the external
-    // async change.
-    //
-    // TODO When we first detect conflicted, we can immediately mark our
-    // mutation as rolled back so that another mutator that has not already been
-    // conflicted by us, will not be conflicted by us because we'll be rolled
-    // back. We must still insert the values, though, because Memento will not
-    // report the conflict until commit is called, and during the transaction
-    // the values are going to need to be in the stages, the version valid for
-    // the mutator that holds the version, so that version ignores the rollback
-    // flag.
-    //
-    // We must still write the results after conflicted rollback, we can't say
-    // oh, well, it's going to be rolled back anyway. The transation writing
-    // these values won't know about the conflict until it ends the transaction
-    // with a commit, and it may perform queries and will expect the data it
-    // just inserted to be present.
+    // Amalgamate implements opportunistic locking. A mutation will proceed
+    // without blocking at any point due to concurrent mutations. The
+    // application will check a conflicted flag at the end of the mutation. If
+    // the mutation is conflicted, the application will roll back the
+    // mutation and then repeat its procedure with a new mutation. It will
+    // repeat this process until the procedure is completes with the mutation
+    // unconflicted or until it gives up.
+
+    // Here I attempt to convince myself that conflicts will always be detected
+    // and that application progress is possible.
+
+    // When a mutation commits it checks for conflicts with competing mutations
+    // which we will call competitors.
+
+    // The version number in a record is the version number of the mutation that
+    // inserted the record.
+
+    // Deletes are insertions of tombstone records so all operations are
+    // inserts.
+
+    // Inserts include a version number. The version number is the version
+    // number of the mutation that performed the insert.
+
+    // Mutations insert their records regardless of conflict because of
+    // isolation. The application will only become aware of conflict when and if
+    // it commits the mutation. The application will expect its inserts to be
+    // visible until it commits or rolls back the mutation.
+
+    // At any point after insert and before commit the mutation will gather all
+    // the versions for all the records it inserted. That is, it will gather all
+    // the version numbers for all the other records in the staging trees that
+    // have the same application key.
+
+    // Note that, we perform this gathering as we go along. There are only ever
+    // at most two staging trees and only during rotation, otherwise there is
+    // just one. Because we group all records for a given key on a single b-tree
+    // leaf page we can gather all the versions for a given key in a given
+    // staging tree with a single descent of the tree. We can perform this
+    // gathering for our active staging in the same descent we use to perform
+    // the insert. We search the secondary staging tree similarly looking to
+    // optimize our descent of tree.
+
+    // Note too that the set of all competitor versions can be no bigger than
+    // the set of all un-amalgamated versions which we are already keeping in
+    // memory. If this sounds like a lot of caching, it is not.
+
+    // As noted, we can obtain the set of competitor versions for each key at
+    // any point after we write and before we commit. It does not matter if
+    // inserts arrive after we gather competitors and before we commit.
+
+    // The conflict check performed prior to commit is synchronous and atomic.
+
+    // If a mutation determines that it conflicts with _any_ competitor it rolls
+    // _itself_ back. A mutation conflicts with a competitor if that competitor
+    // was created after the mutation was created and if the competitor has not
+    // rolled back.
+
+    // Therefore, the first to _detect_ conflict loses.
+
+    // If two mutations conflict, one of them will perform conflict
+    // determination.
+
+    // An insert is atomic.
+
+    // After an insert a mutation gathers all versions inserted including
+    // competing versions.
+
+    // If there is an existing competing version its mutation will be added to
+    // the set of mutations that will be checked for conflicts.
+
+    // If there is an insert after out mutations gathers competitors, that
+    // competitor will add our mutation to its set of competitors and perform
+    // conflict resolution.
+
+    // If you like you can draw a square and when you do, draw the sides out
+    // beyond the corners, and then imagine them starting at the same time, then
+    // crossing at different times, see which lines roll themselves back.
+
+    // Only the first two stages are writable and therefore only the first two
+    // stages are candidates for conflicts.
+
+    // Given any number of multiple overlapping concurrent transactions, one of
+    // them will successfully commit.
+
+    // Spinlock is possible and indeed likely for a transaction that updates a
+    // great many records when there are frequent small transactions that also
+    // update a subset records it updates. One of the small transactions will
+    // cause the large, promiscuous transaction to roll back.
+
+    // It is possible to perform multiple conflict checks as you go, clearing
+    // out the list of competitors as you do, so long as you resume gathering
+    // after performing the check. Although, you will not need to perform
+    // subsequent checks after one has marked your mutation as conflicted.
 
     //
     async merge (mutator, operations, counted = false) {
@@ -560,7 +634,10 @@ class Amalgamator {
         const writes = {}
         const version = mutator.mutation.version
         const group = this.rotator.locker.group(version)
-        const stage = this._stages.filter(stage => stage.group == group).pop()
+        const unamalgamated = this._stages.filter(stage => ! stage.amalgamated)
+        assert(unamalgamated.length == 1 || unamalgamated.length == 2)
+        const stage = unamalgamated[0].group == group ? unamalgamated.shift() : unamalgamated.pop()
+        const secondary = unamalgamated.pop()
         const transforms = operations.map(operation => {
             const order = mutator.mutation.order++
             const transform = this._transformer(operation, order)
@@ -585,7 +662,9 @@ class Amalgamator {
                     if (this._conflictable) {
                         // Making a point of not landing on the first record for
                         // scanning forwards and back unit test coverage.
-                        conflictable.push([ key, 0, 0 ])
+                        if (secondary != null) {
+                            conflictable.push(key)
+                        }
                         this._conflicted(mutator, cursor.page.items, index, key)
                     }
                     // TODO The `version` and `order` are already in the key.
@@ -611,17 +690,23 @@ class Amalgamator {
                 await trampoline.shift()
             }
         }
-        const other = this._stages.filter(other => other !== stage).pop()
-        if (other != null) {
-            while (conflictable.length != 0) {
-                const zeroed = conflictable.shift()
-                other.strata.search(trampoline, zeroed, cursor => {
-                    const { index } = cursor
-                    this._conflicted(mutator, cursor.page.items, cursor.index, zeroed[0])
-                })
-                while (trampoline.seek()) {
-                    await trampoline.shift()
+        conflictable.sort(this.comparator.primary)
+        while (conflictable.length != 0) {
+            const zeroed = [ conflictable[0], 0, 0 ]
+            other.strata.search(trampoline, zeroed, cursor => {
+                this._conflicted(mutator, cursor.page.items, cursor.index, conflictable[0])
+                conflictable.shift()
+                while (conflictable.length != 0) {
+                    const zeroed = [ conflictable[0], 0, 0 ]
+                    const { index, found } = cursor.indexOf(zeroed)
+                    if (index == null) {
+                        break
+                    }
+                    this._conflicted(mutator, cursor.page.items, index, conflictable[0])
                 }
+            })
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         this.rotator.advance()
