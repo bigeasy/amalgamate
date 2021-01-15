@@ -39,7 +39,7 @@ class Rotator {
         })
     }
 
-    static async open (writeahead, { create = false } = {}) {
+    static async open (writeahead) {
         const player = new Player(() => '0')
         const mutations = new Map
         let version = 0
@@ -152,13 +152,11 @@ class Rotator {
         this.locker.advance(this._writeahead.position)
     }
 
-    commit (mutation) {
-        const future = this._writeahead.write([{
+    commit (version) {
+        return this._writeahead.write([{
             keys: [ 'commit' ],
-            buffer: (this._recorder)([[ Buffer.from(JSON.stringify(mutation.mutation.version)) ]])
-        }])
-        this.locker.commit(mutation)
-        return future.promise
+            buffer: (this._recorder)([[ Buffer.from(JSON.stringify(version)) ]])
+        }]).promise
     }
 
     async _rotate (group) {
