@@ -43,6 +43,7 @@ const Strata = require('b-tree')
 const FileSystem = require('b-tree/filesystem')
 const WriteAheadOnly = require('b-tree/writeahead')
 const Magazine = require('magazine')
+const Fracture = require('fracture')
 
 // Reference counts are kept in an array where the reference count is indexed by
 // the position of the stage in the stage array at the time the reference was
@@ -152,7 +153,7 @@ class Amalgamator {
                 ...options.primary,
                 storage: storage,
                 turnstile: options.turnstile,
-                pages: options.pages.magazine(),
+                pages: options.pages.subordinate(),
                 comparator: this.comparator.primary,
                 extractor: options.extractor
             })
@@ -233,7 +234,7 @@ class Amalgamator {
                 leaf: this.comparator.stage.key,
                 branch: whittle(this.comparator.primary, object => object[0]),
             },
-            pages: this._pages.magazine(),
+            pages: this._pages.subordinate(),
             // Meta information is used for merge and that is the thing we're
             // calling a header. The key's in branches will not need meta
             // information so we'll be able to serialize it without any
@@ -412,6 +413,7 @@ class Amalgamator {
     // **TODO** Merge all stages using homogenize and go all at once.
     // **TODO** Why is that only completed mutator correct?
     async _amalgamate (mutator, stage) {
+        const writes = new Fracture.CompletionSet
         const riffle = mvcc.riffle(stage.strata, Strata.MIN)
         const visible = mvcc.dilute(riffle, item => {
             return this.rotator.locker.visible(item.key[1], mutator) ? 1 : 0
@@ -423,7 +425,8 @@ class Amalgamator {
                 key: item.key[0],
                 parts: item.parts[0].method == 'insert' ? item.parts.slice(1) : null
             }
-        }, this.primary, designate)
+        }, this.primary, designate, writes)
+        await writes.clear()
     }
 
     // We amalgamate all stages except for the first. During normal operation we
@@ -574,7 +577,6 @@ class Amalgamator {
 
     //
     async merge (mutator, operations) {
-        const writes = {}
         const version = mutator.mutation.version
         const group = this.rotator.locker.group(version)
         const unamalgamated = this._stages.filter(stage => stage.appending)
@@ -613,9 +615,9 @@ class Amalgamator {
                     // TODO The `version` and `order` are already in the key.
                     const header = { version, method, order }
                     if (method == 'insert') {
-                        heft += cursor.insert(index, compound, [ header ].concat(parts), writes)
+                        heft += cursor.insert(index, compound, [ header ].concat(parts))
                     } else {
-                        heft += cursor.insert(index, compound, [ header, key ], writes)
+                        heft += cursor.insert(index, compound, [ header, key ])
                     }
                 }
                 insert(cursor, transforms.shift())

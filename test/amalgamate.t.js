@@ -138,7 +138,7 @@ require('proof')(19, async okay => {
             }, {
                 type: 'del',
                 key: Buffer.from('b')
-            }], true)
+            }])
 
             okay(mutator.mutation.conflicted, false, 'no conflicts')
 
@@ -323,17 +323,18 @@ require('proof')(19, async okay => {
 
             amalgamator.rotator.locker.release(snapshots.shift())
 
+            let start = Date.now()
             for (let i = 0; i < 128; i++) {
                 const start = Date.now()
                 const mutator = amalgamator.rotator.locker.mutator()
                 const version = i + 1
                 const batch = i == 127 ? put.concat(del.slice(0, 13)) : put.concat(del)
-                await amalgamator.merge(mutator, batch, true)
+                await amalgamator.merge(mutator, batch)
                 assert(!mutator.conflicted)
                 amalgamator.rotator.locker.commit(mutator)
                 await amalgamator.rotator.commit(mutator.mutation.version)
-                //console.log(Date.now() - start)
             }
+            console.log(Date.now() - start)
 
             snapshots.push(amalgamator.rotator.locker.snapshot())
 

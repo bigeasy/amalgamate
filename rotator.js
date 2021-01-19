@@ -156,7 +156,7 @@ class Rotator {
         return this._writeahead.write([{
             keys: [ 'commit' ],
             buffer: (this._recorder)([[ Buffer.from(JSON.stringify(version)) ]])
-        }]).promise
+        }], true).promise
     }
 
     async _rotate (group) {
@@ -165,7 +165,7 @@ class Rotator {
             if (group == null) {
                 break
             }
-            await this._writeahead.rotate()
+            await this._writeahead.rotate().promise
             for (const [ amalgamator, { key, options } ]  of this._amalgamators) {
                 const storage = await WriteAheadOnly.open({
                     ...options,
@@ -195,7 +195,7 @@ class Rotator {
                 await amalgamator.unstage()
             }
             while (this._writeahead._logs.length != 1) {
-                await this._writeahead.shift()
+                await this._writeahead.shift().promise
             }
             this.locker.unstaged()
         }
