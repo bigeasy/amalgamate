@@ -143,7 +143,7 @@ require('proof')(19, async okay => {
             okay(mutator.mutation.conflicted, false, 'no conflicts')
 
             amalgamator.rotator.locker.commit(mutator)
-            await amalgamator.rotator.commit(mutator.mutation.version)
+            await amalgamator.rotator.commit(mutator.mutation.version).promise
 
             snapshots.push(amalgamator.rotator.locker.snapshot())
 
@@ -332,7 +332,7 @@ require('proof')(19, async okay => {
                 await amalgamator.merge(mutator, batch)
                 assert(!mutator.conflicted)
                 amalgamator.rotator.locker.commit(mutator)
-                await amalgamator.rotator.commit(mutator.mutation.version)
+                await amalgamator.rotator.commit(mutator.mutation.version).promise
             }
             console.log(Date.now() - start)
 
@@ -424,7 +424,7 @@ require('proof')(19, async okay => {
             await amalgamator.merge(mutator, put.concat(del.slice(0, 23)), true)
 
             amalgamator.rotator.locker.commit(mutator)
-            await amalgamator.rotator.commit(mutator.mutation.version)
+            await amalgamator.rotator.commit(mutator.mutation.version).promise
 
             amalgamator.rotator.locker.release(snapshots.shift())
 

@@ -156,7 +156,7 @@ class Rotator {
         return this._writeahead.write([{
             keys: [ 'commit' ],
             buffer: (this._recorder)([[ Buffer.from(JSON.stringify(version)) ]])
-        }], true).promise
+        }], true)
     }
 
     async _rotate (group) {
