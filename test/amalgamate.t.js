@@ -46,10 +46,10 @@ require('proof')(19, async okay => {
         const directories = { wal: path.join(directory, 'wal'), tree: path.join(directory, 'trees', 'amalgamator') }
         await fs.mkdir(directories.wal, { recursive: true })
         await fs.mkdir(directories.tree, { recursive: true })
-        const writeahead = new WriteAhead(destructible.durable($ => $(), 'writeahead'), await WriteAhead.open({ directory: directories.wal }))
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
+        const writeahead = new WriteAhead(destructible.durable($ => $(), 'writeahead'), turnstile, await WriteAhead.open({ directory: directories.wal }))
         const handles = new Operation.Cache(new Magazine)
         const rotator = new Rotator(destructible.durable($ => $(), 'rotator'), await Rotator.open(writeahead, { create }), { size: 1024 * 1024 / 4 })
-        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const pages = new Magazine
         return await rotator.open(destructible.durable($ => $(), 'amalgamator'), {
             directory: directories.tree,
