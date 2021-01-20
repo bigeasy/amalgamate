@@ -26,6 +26,7 @@
                             "b-tree":                       "2.0.0-alpha.85",
                             "designate":                    "2.0.0-alpha.15",
                             "dilute":                       "2.0.0-alpha.7",
+                            "fracture":                     "0.3.0-alpha.41",
                             "eject":                        "0.2.3",
                             "extant":                       "^1.0.20",
                             "homogenize":                   "2.0.0-alpha.16",

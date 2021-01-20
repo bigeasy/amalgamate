@@ -413,7 +413,7 @@ class Amalgamator {
     // **TODO** Merge all stages using homogenize and go all at once.
     // **TODO** Why is that only completed mutator correct?
     async _amalgamate (mutator, stage) {
-        const writes = new Fracture.CompletionSet
+        const writes = new Fracture.FutureSet
         const riffle = mvcc.riffle(stage.strata, Strata.MIN)
         const visible = mvcc.dilute(riffle, item => {
             return this.rotator.locker.visible(item.key[1], mutator) ? 1 : 0
@@ -426,7 +426,7 @@ class Amalgamator {
                 parts: item.parts[0].method == 'insert' ? item.parts.slice(1) : null
             }
         }, this.primary, designate, writes)
-        await writes.clear()
+        await writes.join()
     }
 
     // We amalgamate all stages except for the first. During normal operation we
