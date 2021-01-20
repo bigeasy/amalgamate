@@ -162,6 +162,9 @@ class Locker {
 
     //
     conflicted ({ created, mutation }) {
+        if (mutation.conflicted) {
+            return true
+        }
         for (const version of mutation.competitors) {
             if (mutation.version != version) {
                 const group = this._groupByVersion(version)
@@ -170,9 +173,11 @@ class Locker {
                 if (completed.completed > created && ! competitor.rolledback) {
                     mutation.conflicted = true
                     mutation.rolledback = true
+                    break
                 }
             }
         }
+        return mutation.conflicted
     }
     //
 
