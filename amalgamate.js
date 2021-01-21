@@ -163,7 +163,6 @@ class Amalgamator {
             this._newStage(stage)
             this._stages.push(stage)
         }
-        this.destructible.destruct(() => this.deferrable.decrement())
         this.deferrable.destruct(() => {
             this._open = false
             destructible.ephemeral('shutdown', async () => {
