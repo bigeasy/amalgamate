@@ -157,6 +157,7 @@ class Amalgamator {
                 comparator: this.comparator.primary,
                 extractor: options.extractor
             })
+            this.primary.deferrable.increment()
         }
         for (const stage of open.stages) {
             this._newStage(stage)
