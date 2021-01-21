@@ -165,8 +165,8 @@ class Amalgamator {
         }
         this.deferrable.destruct(() => {
             this._open = false
-            destructible.ephemeral('shutdown', async () => {
-                await this.rotator.done()
+            this.deferrable.ephemeral('shutdown', async () => {
+                await this.rotator.drain()
                 this._destructible.amalgamate.decrement()
                 this._destructible.unstage.decrement()
                 for (const strata of [ this.primary ].concat(this._stages.map(stage => stage.strata))) {
