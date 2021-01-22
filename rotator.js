@@ -114,7 +114,6 @@ class Rotator {
             for (const entry of entries) {
                 const key = entry.header.value
                 const storage = await WriteAheadOnly.open({ writeahead: this._writeahead, key, ...open.options })
-                console.log('hello')
                 open.stages.push({
                     name: `stage.${key[1]}`,
                     group: this.locker.latest,
@@ -126,7 +125,6 @@ class Rotator {
         }
         open.stages.reverse()
         if (open.stages.length == 0) {
-            console.log('creating')
             open.stages.push({
                 name: `stage.${this.locker.latest}`,
                 group: this.locker.latest,
@@ -184,7 +182,7 @@ class Rotator {
             }
             this.locker.rotated()
             await this.locker.amalgamating.promise
-            const mutator = { completed: this._completed  }
+            const mutator = { created: this.locker._completed  }
             for (const amalgamator of this._amalgamators.keys()) {
                 await amalgamator.amalgamate(mutator)
             }
