@@ -231,7 +231,6 @@ class Locker {
             this._groups[0].state == 'appending' &&
             this._size[0].max < this.position
         ) {
-        console.log(this._size[0].max, this.position)
             while (this._size.length != 1) {
                 this._unstaged.push(this._size.shift())
             }
@@ -305,9 +304,9 @@ class Locker {
     //
     rotate () {
         const done = new Future
-        this._heft.unshift({ max: -1, done })
+        this._size.unshift({ max: -1, done })
         this._maybeRotate()
-        return done.future
+        return done
     }
 }
 
