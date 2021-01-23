@@ -170,7 +170,7 @@ class Locker {
                 const group = this._groupByVersion(version)
                 const competitor = group.mutations.get(version)
                 assert(competitor)
-                if (completed.completed > created && ! competitor.rolledback) {
+                if (competitor.completed > created && ! competitor.rolledback) {
                     mutation.conflicted = true
                     mutation.rolledback = true
                     break
