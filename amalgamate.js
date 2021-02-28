@@ -9,7 +9,7 @@ let count = 0
 const rescue = require('rescue')
 
 // Return the first non-`null`-like value.
-const coalesce = require('extant')
+const { coalesce } = require('extant')
 
 const Trampoline = require('reciprocate')
 
@@ -18,7 +18,7 @@ const ascension = require('ascension')
 // Extract the sorted field from an object.
 const whittle = require('whittle')
 
-const Interrupt = require('interrupt')
+const { Interrupt } = require('interrupt')
 
 // Strata b-tree iteration ultilities.
 const mvcc = {
