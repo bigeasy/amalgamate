@@ -92,9 +92,18 @@ class Rotator {
                         deserialize: (parts) => {
                             const header = JSON.parse(parts[0].toString())
                             if (header.method == 'insert') {
+                                // TODO You do want to merge the arrays when you serialize, but do
+                                // you want to do so when you deserialize? Can't the users parts be
+                                // in array by themselves so you don't have to slice to pass them
+                                // around? We had a bug where we where doing this here with key
+                                // below which was a bug when the user was using an array key.
+                                //
+                                // The user will always use array parts, that is the parts
+                                // deserializer always returns an array, but the key serializer can
+                                // return a scalar.
                                 return [ header ].concat(serializer.parts.deserialize(parts.slice(1)))
                             }
-                            return [ header ].concat(serializer.key.deserialize(parts.slice(1)))
+                            return [ header, serializer.key.deserialize(parts.slice(1)) ]
                         }
                     }
                 },
