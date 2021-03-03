@@ -565,6 +565,7 @@ class Amalgamator {
 
     //
     async merge (mutator, operations) {
+        const writes = new Fracture.FutureSet
         const version = mutator.mutation.version
         const group = this.rotator.locker.group(version)
         const unamalgamated = this._stages.filter(stage => stage.appending)
@@ -603,9 +604,9 @@ class Amalgamator {
                     // TODO The `version` and `order` are already in the key.
                     const header = { version, method, order }
                     if (method == 'insert') {
-                        heft += cursor.insert(index, compound, [ header ].concat(parts))
+                        heft += cursor.insert(index, compound, [ header ].concat(parts), writes)
                     } else {
-                        heft += cursor.insert(index, compound, [ header, key ])
+                        heft += cursor.insert(index, compound, [ header, key ], writes)
                     }
                 }
                 insert(cursor, transforms.shift())
@@ -642,6 +643,7 @@ class Amalgamator {
                 await trampoline.shift()
             }
         }
+        await writes.join()
         this.rotator.advance()
     }
 
