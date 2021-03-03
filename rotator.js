@@ -173,7 +173,7 @@ class Rotator {
     async _rotate (group) {
         for (;;) {
             const group = await this.locker.rotating.promise
-            if (group == null) {
+            if (group == null || this.deferrable.destroyed) {
                 break
             }
             this.deferrable.increment()
