@@ -51,7 +51,7 @@ require('proof')(19, async okay => {
         const handles = new Operation.Cache(new Magazine)
         const rotator = new Rotator(destructible.durable($ => $(), 'rotator'), await Rotator.open(writeahead, { create }), { size: 1024 * 1024 / 4 })
         const pages = new Magazine
-        return await rotator.open(destructible.durable($ => $(), 'amalgamator'), {
+        return await rotator.open('amalgamator', {
             directory: directories.tree,
             handles,
             create: create,

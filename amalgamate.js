@@ -1,3 +1,5 @@
+'use strict'
+
 // Node.js API.
 const path = require('path')
 const fs = require('fs').promises
@@ -83,15 +85,6 @@ class Amalgamator {
         // Implement the Destructible deferrable pattern.
         this.destructible = destructible
 
-        this.deferrable = destructible.durable($ => $(), { countdown: 1 }, 'deferrable')
-        this.destructible.destruct(() => this.deferrable.decrement())
-
-        this._destructible = {
-            strata: this.destructible.durable($ => $(), 'strata'),
-            amalgamate: this.deferrable.durable($ => $(), { countdown: 1 }, 'xxxamalgamate'),
-            unstage: this.deferrable.durable($ => $(), { countdown: 1 }, 'unstage')
-        }
-
         this.rotator = rotator
 
         // Whether or not this Amalgamator should check for conflicts.
@@ -113,7 +106,6 @@ class Amalgamator {
         // Transforms an application operation into an `Amalgamator` operation.
         this._transformer = options.transformer
 
-        Amalgamator.Error.assert(this.destructible.isDestroyedIfDestroyed(options.turnstile.destructible), 'NOT_SAME_STAGE')
         this._turnstile = options.turnstile
 
         // The Strata b-tree cache to use to store pages.
@@ -147,7 +139,7 @@ class Amalgamator {
         this.strata = strata
 
         {
-            const destructible = this._destructible.strata.durable($ => $(), 'primary')
+            const destructible = this.destructible.durable($ => $(), 'primary')
             const storage = new FileSystem.Writer(destructible.durable($ => $(), 'storage'), open.storage)
             this.primary = new Strata(destructible.durable($ => $(), 'strata'), {
                 ...options.primary,
@@ -163,12 +155,8 @@ class Amalgamator {
             this._newStage(stage)
             this._stages.push(stage)
         }
-        this.deferrable.destruct(() => {
-            this._open = false
-            this.deferrable.ephemeral('shutdown', async () => {
-                await this.rotator.drain()
-                this._destructible.amalgamate.decrement()
-                this._destructible.unstage.decrement()
+        this.destructible.destruct(() => {
+            this.destructible.ephemeral('shutdown', async () => {
                 for (const strata of [ this.primary ].concat(this._stages.map(stage => stage.strata))) {
                     strata.deferrable.decrement()
                 }
@@ -216,7 +204,7 @@ class Amalgamator {
     // Create a new staging tree. The caller will determine if the tree should
     // be opened or created.
     _newStage (open) {
-        const destructible = open.destructible = this._destructible.strata.ephemeral($ => $(), open.name)
+        const destructible = open.destructible = this.destructible.ephemeral($ => $(), open.name)
         const storage = new WriteAheadOnly.Writer(destructible.durable($ => $(), 'storage'), open.storage)
         open.strata = new Strata(destructible.durable($ => $(), 'strata'), {
             ...this.strata.stage,
@@ -420,7 +408,7 @@ class Amalgamator {
         })
         const designate = mvcc.designate(this.comparator.primary, visible)
         await mvcc.splice(item => {
-            this._destructible.amalgamate.progress()
+            this.destructible.progress()
             return {
                 key: item.key[0],
                 parts: item.parts[0].method == 'insert' ? item.parts.slice(1) : null
@@ -687,7 +675,7 @@ class Amalgamator {
             stages.push({ groups, count, path })
         }
         // TODO Impelement `Destructibe.waiting`.
-        return { waiting: this._destructible.amalgamate._waiting.slice(), stages }
+        return { waiting: this.destructible._waiting.slice(), stages }
     }
 }
 

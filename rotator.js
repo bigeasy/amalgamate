@@ -22,20 +22,27 @@ class Rotator {
     constructor (destructible, { writeahead, mutations, version }, { size = 1024 * 1024 } = {}) {
         this.locker = new Locker({ mutations, version, size })
         this.destructible = destructible
-        this.destructible.destruct(() => this.locker.destroy())
+        this.deferrable = destructible.durable($ => $(), { countdown: 1 }, 'deferrable')
+        this.deferrable.destruct(() => this.locker.destroy())
+        this.destructible.destruct(() => this.deferrable.decrement())
+        this._destructible = {
+            amalgamators: this.deferrable.durable('amalgamators')
+        }
         this._amalgamators = new Map
         this._writeahead = writeahead
         this._zeroed = Future.resolve()
         this._rotated = Future.resolve()
         this._recorder = Recorder.create(() => '0')
-        const rotator = this.destructible.durable($ => $(), 'rotate', this._rotate())
+        this.deferrable.durable($ => $(), 'rotate', this._rotate())
         writeahead.deferrable.increment()
-        destructible.destruct(() => {
-            destructible.ephemeral('shutdown', async () => {
-                await rotator.done
-                await destructible.copacetic($ => $(), null, async () => this.drain())
+        this.deferrable.destruct(() => {
+            this.deferrable.ephemeral('shutdown', async () => {
+                await this._destructible.amalgamators.done
                 writeahead.deferrable.decrement()
             })
+        })
+        this.deferrable.panic(() => {
+            console.log('PANIC!')
         })
     }
 
@@ -57,7 +64,7 @@ class Rotator {
         return { writeahead, mutations, version }
     }
 
-    async open (destructible, { directory, handles, create, key, serializer, checksum, extractor }, options) {
+    async open (name, { directory, handles, create, key, serializer, checksum, extractor }, options) {
         const open = {
             key: key,
             directory: directory,
@@ -150,7 +157,7 @@ class Rotator {
         } else {
             open.stages[0].appending = true
         }
-        const amalgamator = new Amalgamator(destructible, this, open, options)
+        const amalgamator = new Amalgamator(this._destructible.amalgamators.durable(name), this, open, options)
         this._amalgamators.set(amalgamator, { key, options: open.options })
         return amalgamator
     }
@@ -168,10 +175,13 @@ class Rotator {
 
     async _rotate (group) {
         for (;;) {
+            console.log('>>>', this.deferrable.countdown)
             const group = await this.locker.rotating.promise
+            console.log('>>>', this.deferrable.countdown, group)
             if (group == null) {
                 break
             }
+            this.deferrable.increment()
             await this._writeahead.rotate().promise
             for (const [ amalgamator, { key, options } ]  of this._amalgamators) {
                 const storage = await WriteAheadOnly.open({
@@ -205,6 +215,7 @@ class Rotator {
                 await this._writeahead.shift().promise
             }
             this.locker.unstaged()
+            this.deferrable.decrement()
         }
     }
 
@@ -215,6 +226,7 @@ class Rotator {
     }
 
     drain () {
+        throw new Error('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX')
         let drains = this._drain()
         if (drains.length != 0) {
             return (async () => {
