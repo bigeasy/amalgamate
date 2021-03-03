@@ -41,9 +41,6 @@ class Rotator {
                 writeahead.deferrable.decrement()
             })
         })
-        this.deferrable.panic(() => {
-            console.log('PANIC!')
-        })
     }
 
     static async open (writeahead) {
@@ -175,9 +172,7 @@ class Rotator {
 
     async _rotate (group) {
         for (;;) {
-            console.log('>>>', this.deferrable.countdown)
             const group = await this.locker.rotating.promise
-            console.log('>>>', this.deferrable.countdown, group)
             if (group == null) {
                 break
             }
