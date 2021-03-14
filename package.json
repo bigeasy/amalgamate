@@ -46,7 +46,7 @@
     },
     "devDependencies":
     {
-                            "destructible":                 "7.0.0-alpha.50",
+                            "destructible":                 "7.0.0-alpha.57",
                             "proof":                        "^9.0.2"
     },
     "main":                 "amalgamate",
