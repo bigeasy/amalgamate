@@ -20,7 +20,7 @@ const ascension = require('ascension')
 // Extract the sorted field from an object.
 const whittle = require('whittle')
 
-const { Interrupt } = require('interrupt')
+const Interrupt = require('interrupt')
 
 // Strata b-tree iteration ultilities.
 const mvcc = {
@@ -400,21 +400,20 @@ class Amalgamator {
     // **TODO** Mark amlamgamated and filter out amalgamated on read.
     // **TODO** Merge all stages using homogenize and go all at once.
     // **TODO** Why is that only completed mutator correct?
-    async _amalgamate (mutator, stage) {
-        const writes = new Fracture.FutureSet
+    async _amalgamate (stack, mutator, stage) {
+        assert(stack instanceof Fracture.Stack)
         const riffle = mvcc.riffle(stage.strata, Strata.MIN)
         const visible = mvcc.dilute(riffle, item => {
             return this.rotator.locker.visible(item.key[1], mutator) ? 1 : 0
         })
         const designate = mvcc.designate(this.comparator.primary, visible)
-        await mvcc.splice(item => {
+        await mvcc.splice(stack, item => {
             this.destructible.progress()
             return {
                 key: item.key[0],
                 parts: item.parts[0].method == 'insert' ? item.parts.slice(1) : null
             }
-        }, this.primary, designate, writes)
-        await writes.join()
+        }, this.primary, designate)
     }
 
     // We amalgamate all stages except for the first. During normal operation we
@@ -422,9 +421,10 @@ class Amalgamator {
     // during a recovery.
 
     //
-    async amalgamate (mutator) {
+    async amalgamate (stack, mutator) {
+        assert(stack instanceof Fracture.Stack)
         for (const stage of this._stages.slice(1)) {
-            await this._amalgamate(mutator, stage)
+            await this._amalgamate(stack, mutator, stage)
         }
     }
 
@@ -564,8 +564,9 @@ class Amalgamator {
     // subsequent checks after one has marked your mutation as conflicted.
 
     //
-    async merge (mutator, operations) {
-        const writes = new Fracture.FutureSet
+    async merge (stack, mutator, operations) {
+        assert(stack instanceof Fracture.Stack)
+        const promises = new Set
         const version = mutator.mutation.version
         const group = this.rotator.locker.group(version)
         const unamalgamated = this._stages.filter(stage => stage.appending)
@@ -587,7 +588,6 @@ class Amalgamator {
         while (transforms.length != 0) {
             stage.strata.search(trampoline, transforms[0].compound, cursor => {
                 const { index, found } = cursor
-                assert(!found)
                 const insert = ({
                     index, found
                 }, {
@@ -604,10 +604,12 @@ class Amalgamator {
                     // TODO The `version` and `order` are already in the key.
                     const header = { version, method, order }
                     if (method == 'insert') {
-                        heft += cursor.insert(index, compound, [ header ].concat(parts), writes)
+                         promises.add(cursor.insert(stack, index, compound, [ header ].concat(parts)))
                     } else {
-                        heft += cursor.insert(index, compound, [ header, key ], writes)
+                         promises.add(cursor.insert(stack, index, compound, [ header, key ]))
                     }
+                    assert(cursor.page.items[index].heft)
+                    heft += cursor.page.items[index].heft
                 }
                 insert(cursor, transforms.shift())
                 stage.count++
@@ -627,7 +629,7 @@ class Amalgamator {
         conflictable.sort(this.comparator.primary)
         while (conflictable.length != 0) {
             const zeroed = [ conflictable[0], 0, 0 ]
-            other.strata.search(trampoline, zeroed, cursor => {
+            secondary.strata.search(trampoline, zeroed, cursor => {
                 this._conflicted(mutator, cursor.page.items, cursor.index, conflictable[0])
                 conflictable.shift()
                 while (conflictable.length != 0) {
@@ -637,13 +639,16 @@ class Amalgamator {
                         break
                     }
                     this._conflicted(mutator, cursor.page.items, index, conflictable[0])
+                    conflictable.shift()
                 }
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
         }
-        await writes.join()
+        for (const promise of promises) {
+            await promise
+        }
         this.rotator.advance()
     }
 

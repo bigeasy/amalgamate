@@ -8,6 +8,7 @@ require('proof')(19, async okay => {
     const path = require('path')
     const fs = require('fs').promises
 
+    const Fracture = require('fracture')
     const Rotator = require('../rotator')
     const Trampoline = require('reciprocate')
     const Operation = require('operation')
@@ -51,7 +52,7 @@ require('proof')(19, async okay => {
         const handles = new Operation.Cache(new Magazine)
         const rotator = new Rotator(destructible.durable($ => $(), 'rotator'), await Rotator.open(writeahead, { create }), { size: 1024 * 1024 / 4 })
         const pages = new Magazine
-        return await rotator.open('amalgamator', {
+        return await rotator.open(Fracture.stack(), 'amalgamator', {
             directory: directories.tree,
             handles,
             create: create,
@@ -123,7 +124,7 @@ require('proof')(19, async okay => {
 
             const mutator = amalgamator.rotator.locker.mutator()
 
-            await amalgamator.merge(mutator, [{
+            await amalgamator.merge(Fracture.stack(), mutator, [{
                 type: 'put',
                 key: Buffer.from('a'),
                 value: Buffer.from('A')
@@ -143,7 +144,7 @@ require('proof')(19, async okay => {
             okay(mutator.mutation.conflicted, false, 'no conflicts')
 
             amalgamator.rotator.locker.commit(mutator)
-            await amalgamator.rotator.commit(mutator.mutation.version).promise
+            await amalgamator.rotator.commit(Fracture.stack(), mutator.mutation.version).promise
 
             snapshots.push(amalgamator.rotator.locker.snapshot())
 
@@ -329,10 +330,10 @@ require('proof')(19, async okay => {
                 const mutator = amalgamator.rotator.locker.mutator()
                 const version = i + 1
                 const batch = i == 127 ? put.concat(del.slice(0, 13)) : put.concat(del)
-                await amalgamator.merge(mutator, batch)
+                await amalgamator.merge(Fracture.stack(), mutator, batch)
                 assert(!mutator.conflicted)
                 amalgamator.rotator.locker.commit(mutator)
-                await amalgamator.rotator.commit(mutator.mutation.version).promise
+                await amalgamator.rotator.commit(Fracture.stack(), mutator.mutation.version).promise
             }
             console.log(Date.now() - start)
 
@@ -421,10 +422,10 @@ require('proof')(19, async okay => {
             // **TODO** Reset versions if we rotate to zero.
             okay(mutator.mutation.version, 132, 'clean shutdown')
 
-            await amalgamator.merge(mutator, put.concat(del.slice(0, 23)), true)
+            await amalgamator.merge(Fracture.stack(), mutator, put.concat(del.slice(0, 23)), true)
 
             amalgamator.rotator.locker.commit(mutator)
-            await amalgamator.rotator.commit(mutator.mutation.version).promise
+            await amalgamator.rotator.commit(Fracture.stack(), mutator.mutation.version).promise
 
             amalgamator.rotator.locker.release(snapshots.shift())
 
@@ -472,7 +473,7 @@ require('proof')(19, async okay => {
             }
         })
 
-        destructible.rescue($ => $(), 'test', async function () {
+        destructible.ephemeral($ => $(), 'test', async function () {
             const gather = []
 
             await amalgamator.count()
@@ -609,7 +610,9 @@ require('proof')(19, async okay => {
         const destructible = new Destructible($ => $(), 'amagamate.t')
         const amalgamator = await createAmalgamator(destructible.durable($ => $(), 'amalgamator'), { conflictable: false })
 
-        await destructible.rescue($ => $(), 'test', async function () {
+        console.log('calling')
+        destructible.ephemeral($ => $(), 'test', async function () {
+            await new Promise(resolve => setTimeout(resolve, 1000))
             const gather = []
 
             const versions = new Set
@@ -706,6 +709,8 @@ require('proof')(19, async okay => {
             destructible.destroy()
         })
 
+        console.log('awaiting')
         await destructible.promise
+        console.log('awaited')
     }
 })

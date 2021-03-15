@@ -2,6 +2,9 @@ const assert = require('assert')
 
 const { Recorder, Player } = require('transcript')
 
+const noop = require('nop')
+
+const Fracture = require('fracture')
 const FileSystem = require('b-tree/filesystem')
 const WriteAheadOnly = require('b-tree/writeahead')
 const Amalgamator = require('./amalgamate')
@@ -61,7 +64,8 @@ class Rotator {
         return { writeahead, mutations, version }
     }
 
-    async open (name, { directory, handles, create, key, serializer, checksum, extractor }, options) {
+    async open (stack, name, { directory, handles, create, key, serializer, checksum, extractor }, options) {
+        assert(stack instanceof Fracture.Stack)
         const open = {
             key: key,
             directory: directory,
@@ -126,7 +130,7 @@ class Rotator {
         for await (const entries of WriteAheadOnly.wal.iterator(this._writeahead, [ 'locate' ], key)) {
             for (const entry of entries) {
                 const key = entry.header.value
-                const storage = await WriteAheadOnly.open({ writeahead: this._writeahead, key, ...open.options })
+                const storage = await WriteAheadOnly.open(stack, { writeahead: this._writeahead, key, ...open.options })
                 open.stages.push({
                     name: `stage.${key[1]}`,
                     group: this.locker.latest,
@@ -144,7 +148,7 @@ class Rotator {
                 count: 0,
                 key: this.locker.latest,
                 appending: true,
-                storage: await WriteAheadOnly.open({
+                storage: await WriteAheadOnly.open(stack, {
                     ...open.options,
                     writeahead: this._writeahead,
                     key: [ key, 0 ],
@@ -163,23 +167,28 @@ class Rotator {
         this.locker.advance(this._writeahead.position)
     }
 
-    commit (version) {
-        return this._writeahead.write([{
+    commit (stack, version) {
+        assert(stack instanceof Fracture.Stack)
+        return this._writeahead.write(stack, [{
             keys: [ 'commit' ],
             buffer: (this._recorder)([[ Buffer.from(JSON.stringify(version)) ]])
         }], true)
     }
 
+    // Unless I block on drain from within fracture somewhere, this should be
+    // fine, to call from an unrooted stack. Perhaps this too belongs in
+    // fracture, though.
     async _rotate (group) {
+        const stack = Fracture.stack()
         for (;;) {
             const group = await this.locker.rotating.promise
             if (group == null || this.deferrable.destroyed) {
                 break
             }
             this.deferrable.increment()
-            await this._writeahead.rotate().promise
+            await this._writeahead.rotate(stack)
             for (const [ amalgamator, { key, options } ]  of this._amalgamators) {
-                const storage = await WriteAheadOnly.open({
+                const storage = await WriteAheadOnly.open(Fracture.stack(), {
                     ...options,
                     writeahead: this._writeahead,
                     key: [ key, group ],
@@ -198,7 +207,7 @@ class Rotator {
             await this.locker.amalgamating.promise
             const mutator = { created: this.locker._completed  }
             for (const amalgamator of this._amalgamators.keys()) {
-                await amalgamator.amalgamate(mutator)
+                await amalgamator.amalgamate(stack, mutator)
             }
             this.locker.amalgamated()
             await this.locker.unstaging.promise
@@ -207,7 +216,7 @@ class Rotator {
                 await amalgamator.unstage()
             }
             while (this._writeahead._logs.length != 1) {
-                await this._writeahead.shift().promise
+                await this._writeahead.shift(stack)
             }
             this.locker.unstaged()
             this.deferrable.decrement()
@@ -237,7 +246,7 @@ class Rotator {
     }
 
     done () {
-        return this.destructible.done.promise
+        return this.destructible.promise.catch(noop)
     }
 }
 
