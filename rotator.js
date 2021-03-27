@@ -10,7 +10,7 @@ const WriteAheadOnly = require('b-tree/writeahead')
 const Amalgamator = require('./amalgamate')
 
 const Locker = require('./locker')
-const Future = require('perhaps')
+const { Future } = require('perhaps')
 //
 
 // Rotator and Locker are separate so we can unit test the MVCC locking logic

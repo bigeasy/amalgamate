@@ -4,7 +4,7 @@
 const assert = require('assert')
 
 // A `Promise` wrapper that captures `resolve` and `reject`.
-const Future = require('perhaps')
+const { Future } = require('perhaps')
 
 class Locker {
     constructor ({ mutations, version, size }) {
