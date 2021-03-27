@@ -43,7 +43,7 @@
                             "turnstile":                    "6.0.0-alpha.75",
                             "twiddle":                      "2.0.0-alpha.8",
                             "whittle":                      "0.0.1",
-                            "writeahead":                   "0.0.40"
+                            "writeahead":                   "0.0.41"
     },
     "devDependencies":
     {
