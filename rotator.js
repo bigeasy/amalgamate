@@ -50,12 +50,13 @@ class Rotator {
         const player = new Player(() => '0')
         const mutations = new Map
         let version = 0
-        for await (const buffer of writeahead.get('commit')) {
+        for await (const buffer of writeahead.get('transaction')) {
             for (const entry of player.split(buffer)) {
+                const json = JSON.parse(entry.parts.shift())
                 const mutation = {
-                    version: JSON.parse(entry.parts.shift()),
+                    version: json.version,
                     completed: 0,
-                    rolledback: false
+                    rolledback: json.rolledback
                 }
                 mutations.set(mutation.version, mutation)
                 version = Math.max(version, mutation.version)
@@ -170,8 +171,15 @@ class Rotator {
     commit (stack, version) {
         assert(stack instanceof Fracture.Stack)
         return this._writeahead.write(stack, [{
-            keys: [ 'commit' ],
-            buffer: (this._recorder)([[ Buffer.from(JSON.stringify(version)) ]])
+            keys: [ 'transaction' ],
+            buffer: (this._recorder)([[ Buffer.from(JSON.stringify({ version, rolledback: false })) ]])
+        }], true)
+    }
+
+    rollback (stack, version) {
+        return this._writeahead.write(stack, [{
+            keys: [ 'transaction' ],
+            buffer: (this._recorder)([[ Buffer.from(JSON.stringify({ version, rolledback: true })) ]])
         }], true)
     }
 
