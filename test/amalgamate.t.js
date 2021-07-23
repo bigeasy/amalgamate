@@ -19,6 +19,7 @@ require('proof')(19, async okay => {
     const WriteAhead = require('writeahead')
     const FileSystem = require('b-tree/filesystem')
     const Magazine = require('magazine')
+    const { coalesce } = require('extant')
 
     const rescue = require('rescue')
 
@@ -26,7 +27,7 @@ require('proof')(19, async okay => {
 
     const directory = path.join(__dirname, 'tmp', 'amalgamate')
 
-    await fs.rmdir(directory, { recursive: true })
+    await coalesce(fs.rm, fs.rmdir).call(fs, directory, { force: true, recursive: true })
 
     const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('')
 
