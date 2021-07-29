@@ -307,7 +307,7 @@ class Amalgamator {
                     ? [ key ]
                     : [ key, 0 ]
                 : inclusive
-                    ? [ key, Number.MAX_SAFE_INTEGER ]
+                    ? [ key, 0 ]
                     : [ key ]
             : direction == 'forward'
                 ? Strata.MIN

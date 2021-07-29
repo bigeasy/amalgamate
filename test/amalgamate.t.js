@@ -421,7 +421,7 @@ require('proof')(19, async okay => {
             const mutator = amalgamator.rotator.locker.mutator()
 
             // **TODO** Reset versions if we rotate to zero.
-            okay(mutator.mutation.version, 132, 'clean shutdown')
+            okay(mutator.mutation.version, 133, 'clean shutdown')
 
             await amalgamator.merge(Fracture.stack(), mutator, put.concat(del.slice(0, 23)), true)
 

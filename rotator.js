@@ -49,7 +49,7 @@ class Rotator {
     static async open (writeahead) {
         const player = new Player(() => '0')
         const mutations = new Map
-        let version = 0
+        let version = 1
         for await (const buffer of writeahead.get('transaction')) {
             for (const entry of player.split(buffer)) {
                 const json = JSON.parse(entry.parts.shift())
