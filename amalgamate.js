@@ -300,7 +300,20 @@ class Amalgamator {
         // If we are exclusive we will use a maximum version going forward and a
         // minimum version going backward, puts us where we'd expect to be if we
         // where doing exclusive with the external key only.
+        //
         // TODO Not sure what no key plus exclusive means.
+        //
+        // The key alone puts us at either the newest version of the sought key
+        // or the newest version of the next record going forward or the oldest
+        // version of the previous record going backward.
+        //
+        // The key plus a zero version puts either at the oldest version of the
+        // sought record or the oldest version of the previous record going
+        // backward or the newest version of the next record going forward.
+        //
+        // Whether the actual `riffle` search of a is inclusive or exclusive is
+        // immaterial since the search is always by a partial key. It does apply
+        // for a search of the primary tree.
         const versioned = key != null
             ? direction == 'forward'
                 ? inclusive
@@ -331,7 +344,7 @@ class Amalgamator {
         const riffles = this._stages.filter(stage => {
             return snapshot.groups.some(group => group.group == stage.group)
         }).map(stage => {
-            return mvcc.riffle(stage.strata, versioned, { slice: 32, inclusive, reverse })
+            return mvcc.riffle(stage.strata, versioned, { slice: 32, reverse })
         }).concat(primary).concat(additional)
         const homogenize = mvcc.homogenize(this.comparator.stage.key, riffles)
         const visible = mvcc.dilute(homogenize, item => {
