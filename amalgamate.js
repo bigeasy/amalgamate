@@ -93,7 +93,7 @@ class Amalgamator {
         // For staging we wrap the application key comparator in a comparator
         // that will include the version and order of the operation. The order
         // is the order in which we processed the record in a batch.
-        const stage = ascension([ options.comparator, [ Number, -1 ], [ Number, -1 ] ])
+        const stage = ascension([ options.comparator, Number, -1, Number, -1 ])
 
         this.comparator = {
             primary: options.comparator,
