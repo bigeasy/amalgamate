@@ -10,7 +10,7 @@ require('proof')(19, async okay => {
 
     const Fracture = require('fracture')
     const Rotator = require('../rotator')
-    const Trampoline = require('reciprocate')
+    const { Trampoline } = require('reciprocate')
     const Operation = require('operation')
     const Destructible = require('destructible')
     const Amalgamator = require('..')

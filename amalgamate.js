@@ -13,7 +13,7 @@ const rescue = require('rescue')
 // Return the first non-`null`-like value.
 const { coalesce } = require('extant')
 
-const Trampoline = require('reciprocate')
+const { Trampoline } = require('reciprocate')
 
 // Sort function generator.
 const ascension = require('ascension')
@@ -210,18 +210,8 @@ class Amalgamator {
             ...this.strata.stage,
             storage: storage,
             turnstile: this._turnstile,
-            comparator: {
-                zero: object => {
-                    assert(Array.isArray(object))
-                    return [
-                        object[0],
-                        Number.MAX_SAFE_INTEGER,
-                        Number.MAX_SAFE_INTEGER
-                    ]
-                },
-                leaf: this.comparator.stage.key,
-                branch: whittle(this.comparator.primary, object => object[0]),
-            },
+            comparator: this.comparator.stage.key,
+            partition: 1,
             pages: this._pages.subordinate(),
             // Meta information is used for merge and that is the thing we're
             // calling a header. The key's in branches will not need meta
