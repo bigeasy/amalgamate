@@ -93,7 +93,7 @@ class Amalgamator {
         // For staging we wrap the application key comparator in a comparator
         // that will include the version and order of the operation. The order
         // is the order in which we processed the record in a batch.
-        const stage = ascension([ options.comparator, Number, -1, Number, -1 ])
+        const stage = ascension([ options.comparator, Number, -1, Number, -1 ], true)
 
         this.comparator = {
             primary: options.comparator,
@@ -306,29 +306,15 @@ class Amalgamator {
         // Whether the actual `riffle` search of a is inclusive or exclusive is
         // immaterial since the search is always by a partial key. It does apply
         // for a search of the primary tree.
-        const partial = direction == 'forward' ?
-            ? inclusive
-                ? Number.MAX_SAFE_INTEGER
-                : key.length
-            : inclusive
-                ? key.length
-                : Number.MAX_SAFE_INTEGER
-        const padded = key == null
-            ? direction == 'forward'
-                ? Strata.MIN
-                : Strata.MAX
-            : inclusive
-                ? direction == 'forward'
-                    ? inclusive
-                        ? key
-                        : key.concat(null)
-                : inclusive
-                    ? key.concat(null)
-                    : key
-
         const reverse = direction == 'reverse'
 
-        const riffle = mvcc.riffle(this.primary, padded, { slice: 32, inclusive, reverse, partial })
+        const keys = key == null
+            ? direction == 'reverse'
+                ? { staged: Strata.MAX, primary: Strata.MAX }
+                : { staged: Strata.MIN, primary: Strata.MAX }
+            : { staged: [ key ], primary: key }
+
+        const riffle = mvcc.riffle(this.primary, keys.primary, { slice: 32, inclusive, reverse })
 
         const primary = mvcc.twiddle(riffle, items => {
             return items.map(item => {
@@ -351,7 +337,7 @@ class Amalgamator {
         const riffles = this._stages.filter(stage => {
             return snapshot.groups.some(group => group.group == stage.group)
         }).map(stage => {
-            return mvcc.riffle(stage.strata, [ padded ], { slice: 32, reverse })
+            return mvcc.riffle(stage.strata, keys.staged, { slice: 32, reverse, inclusive })
         }).concat(primary).concat(additional)
         const homogenize = mvcc.homogenize(this.comparator.stage.key, riffles)
         const visible = mvcc.dilute(homogenize, item => {
