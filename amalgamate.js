@@ -99,7 +99,7 @@ class Amalgamator {
             primary: options.comparator,
             stage: {
                 key: stage,
-                item: whittle(stage, item => item.key)
+                item: whittle(stage, item => item.key, true)
             }
         }
 
