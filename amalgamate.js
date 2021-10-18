@@ -311,7 +311,7 @@ class Amalgamator {
         const keys = key == null
             ? direction == 'reverse'
                 ? { staged: Strata.MAX, primary: Strata.MAX }
-                : { staged: Strata.MIN, primary: Strata.MAX }
+                : { staged: Strata.MIN, primary: Strata.MIN }
             : { staged: [ key ], primary: key }
 
         const riffle = mvcc.riffle(this.primary, keys.primary, { slice: 32, inclusive, reverse })
