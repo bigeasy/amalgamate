@@ -151,10 +151,12 @@ class Amalgamator {
             })
             this.primary.deferrable.increment()
         }
+
         for (const stage of open.stages) {
             this._newStage(stage)
             this._stages.push(stage)
         }
+
         this.destructible.destruct(() => {
             this.destructible.ephemeral('shutdown', async () => {
                 for (const strata of [ this.primary ].concat(this._stages.map(stage => stage.strata))) {
@@ -304,21 +306,29 @@ class Amalgamator {
         // Whether the actual `riffle` search of a is inclusive or exclusive is
         // immaterial since the search is always by a partial key. It does apply
         // for a search of the primary tree.
-        const versioned = key != null
+        const partial = direction == 'forward' ?
+            ? inclusive
+                ? Number.MAX_SAFE_INTEGER
+                : key.length
+            : inclusive
+                ? key.length
+                : Number.MAX_SAFE_INTEGER
+        const padded = key == null
             ? direction == 'forward'
-                ? inclusive
-                    ? [ key ]
-                    : [ key, 0 ]
-                : inclusive
-                    ? [ key, 0 ]
-                    : [ key ]
-            : direction == 'forward'
                 ? Strata.MIN
                 : Strata.MAX
-        const uncompound = typeof versioned == 'symbol' ? versioned : versioned[0]
+            : inclusive
+                ? direction == 'forward'
+                    ? inclusive
+                        ? key
+                        : key.concat(null)
+                : inclusive
+                    ? key.concat(null)
+                    : key
+
         const reverse = direction == 'reverse'
 
-        const riffle = mvcc.riffle(this.primary, uncompound, { slice: 32, inclusive, reverse })
+        const riffle = mvcc.riffle(this.primary, padded, { slice: 32, inclusive, reverse, partial })
 
         const primary = mvcc.twiddle(riffle, items => {
             return items.map(item => {
@@ -331,10 +341,17 @@ class Amalgamator {
             })
         })
 
+        // Horrors. Either we find a way to nest paritial comparisons, or else
+        // provide a means to trim the key other than prividing a comparator,
+        // either a nested structure which is terrible, or a rewrite function,
+        // or else we flatten our versioned key so that our version information
+        // is added to the end of the key array. At this point, I'd say adding
+        // the trim function would get this done in a matter of minutes, whereas
+        // flattening would take a lot for figuring.
         const riffles = this._stages.filter(stage => {
             return snapshot.groups.some(group => group.group == stage.group)
         }).map(stage => {
-            return mvcc.riffle(stage.strata, versioned, { slice: 32, reverse })
+            return mvcc.riffle(stage.strata, [ padded ], { slice: 32, reverse })
         }).concat(primary).concat(additional)
         const homogenize = mvcc.homogenize(this.comparator.stage.key, riffles)
         const visible = mvcc.dilute(homogenize, item => {
