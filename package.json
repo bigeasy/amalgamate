@@ -23,7 +23,7 @@
     "dependencies":
     {
                             "ascension":                    "3.0.0-alpha.12",
-                            "b-tree":                       "2.0.0-alpha.125",
+                            "b-tree":                       "2.0.0-alpha.126",
                             "designate":                    "2.0.0-alpha.23",
                             "dilute":                       "2.0.0-alpha.8",
                             "eject":                        "0.3.1",
