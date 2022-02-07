@@ -42,7 +42,7 @@
                             "splice":                       "3.0.0-alpha.80",
                             "turnstile":                    "6.0.0-alpha.83",
                             "twiddle":                      "2.0.0-alpha.9",
-                            "whittle":                      "0.0.5",
+                            "whittle":                      "0.0.6",
                             "writeahead":                   "0.0.49"
     },
     "devDependencies":
